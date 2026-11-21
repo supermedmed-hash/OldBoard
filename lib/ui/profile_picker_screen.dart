@@ -33,49 +33,68 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
   @override
   Widget build(BuildContext context) {
     final active = VehicleProfile.byId(_selectedId);
+    final compactH = MediaQuery.sizeOf(context).height < 430;
 
     return Scaffold(
       backgroundColor: Retro.bg,
       appBar: widget.isFirstLaunch
           ? null
           : AppBar(
-              title: Text('Profil véhicule & Thème', style: Retro.title(16)),
+              title: Text(
+                'Profil véhicule & Thème',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Retro.title(16),
+              ),
             ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+          padding: EdgeInsets.fromLTRB(14, compactH ? 8 : 14, 14, compactH ? 8 : 14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (widget.isFirstLaunch) ...[
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Container(width: 4, height: 24, color: active.accent),
+                    Container(width: 4, height: compactH ? 24 : 32, color: active.accent),
                     const SizedBox(width: 10),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('BIENVENUE SUR OLDBOARD', style: Retro.title(17, c: Retro.white)),
-                        const SizedBox(height: 2),
-                        const Text(
-                          'Choisissez votre modèle VAG (1995–2004) pour adapter le thème et les calculs',
-                          style: TextStyle(color: Retro.grey, fontSize: 12),
-                        ),
-                      ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'BIENVENUE SUR OLDBOARD',
+                              maxLines: 1,
+                              style: Retro.title(17, c: Retro.white),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          const Text(
+                            'Choisissez votre modèle VAG (1995–2004) pour adapter le thème et les calculs',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: Retro.grey, fontSize: 12),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: compactH ? 8 : 14),
               ],
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, box) {
-                    final cols = box.maxWidth > 680 ? 2 : 1;
+                    final cols = box.maxWidth > 620 ? 2 : 1;
                     if (cols == 1) {
                       return ListView.separated(
                         itemCount: VehicleProfile.all.length,
                         separatorBuilder: (_, _) => const SizedBox(height: 10),
-                        itemBuilder: (_, i) => _profileCard(VehicleProfile.all[i]),
+                        itemBuilder: (_, i) => _profileCard(VehicleProfile.all[i], gridMode: false),
                       );
                     }
                     return GridView.builder(
@@ -83,29 +102,34 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
                         crossAxisCount: 2,
                         crossAxisSpacing: 10,
                         mainAxisSpacing: 10,
-                        childAspectRatio: 3.1,
+                        mainAxisExtent: 92,
                       ),
                       itemCount: VehicleProfile.all.length,
-                      itemBuilder: (_, i) => _profileCard(VehicleProfile.all[i]),
+                      itemBuilder: (_, i) => _profileCard(VehicleProfile.all[i], gridMode: true),
                     );
                   },
                 ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: compactH ? 8 : 12),
               SizedBox(
-                height: 46,
+                height: compactH ? 42 : 46,
                 child: FilledButton(
                   style: FilledButton.styleFrom(
                     backgroundColor: active.accent,
                     foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   onPressed: () => widget.onSelected(active),
-                  child: Text(
-                    widget.isFirstLaunch
-                        ? 'DÉMARRER AVEC ${active.headerShort}'
-                        : 'APPLIQUER LE PROFIL ${active.headerShort}',
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 1.0),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      widget.isFirstLaunch
+                          ? 'DÉMARRER AVEC ${active.headerShort}'
+                          : 'APPLIQUER LE PROFIL ${active.headerShort}',
+                      maxLines: 1,
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 1.0),
+                    ),
                   ),
                 ),
               ),
@@ -116,13 +140,13 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
     );
   }
 
-  Widget _profileCard(VehicleProfile p) {
+  Widget _profileCard(VehicleProfile p, {required bool gridMode}) {
     final selected = p.id == _selectedId;
     return InkWell(
       onTap: () => setState(() => _selectedId = p.id),
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: EdgeInsets.symmetric(horizontal: 12, vertical: gridMode ? 8 : 12),
         decoration: BoxDecoration(
           color: selected ? p.accent.withValues(alpha: 0.12) : Retro.surface,
           borderRadius: BorderRadius.circular(12),
@@ -133,12 +157,13 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
         ),
         child: Row(
           children: [
-            BrandEmblem(brand: p.brand, accent: p.accent, size: 36),
-            const SizedBox(width: 14),
+            BrandEmblem(brand: p.brand, accent: p.accent, size: 34),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     p.name,
@@ -146,12 +171,12 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
                     overflow: TextOverflow.ellipsis,
                     style: Retro.title(13.5, c: Retro.white),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 3),
                   Text(
                     p.subtitle,
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Retro.silver, fontSize: 11.5),
+                    style: const TextStyle(color: Retro.silver, fontSize: 11.5, height: 1.2),
                   ),
                 ],
               ),

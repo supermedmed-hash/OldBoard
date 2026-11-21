@@ -110,7 +110,9 @@ class _DiagScreenState extends State<DiagScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: Retro.surface,
         title: Text(title, style: Retro.title(15)),
-        content: Text(body, style: const TextStyle(color: Retro.silver, fontSize: 13, height: 1.4)),
+        content: SingleChildScrollView(
+          child: Text(body, style: const TextStyle(color: Retro.silver, fontSize: 13, height: 1.4)),
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
           FilledButton(
@@ -131,7 +133,11 @@ class _DiagScreenState extends State<DiagScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Diagnostic & Atelier Moteur'),
+        title: const Text(
+          'Diagnostic & Atelier Moteur',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         actions: [
           IconButton(
             tooltip: 'Copier le rapport de diagnostic',
@@ -140,301 +146,398 @@ class _DiagScreenState extends State<DiagScreen> {
           ),
         ],
       ),
-      body: ListenableBuilder(
-        listenable: c,
-        builder: (context, _) {
-          return ListView(
-            padding: const EdgeInsets.all(12),
-            children: [
-              _card('Connexion & Export Debug', [
-                Text('État : ${c.status}'),
-                if (c.ecuId != null) Text('Calculateur : ${c.ecuId}'),
-                if (!KLineService.supported)
-                  const Text('Le câble USB ne fonctionne que dans l\'application Android.',
-                      style: TextStyle(color: Retro.grey)),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    FilledButton.icon(
-                      onPressed: _copyReport,
-                      icon: const Icon(Icons.copy, size: 18),
-                      label: const Text('Copier le rapport complet'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: c.clearLogs,
-                      icon: const Icon(Icons.delete_outline, size: 18),
-                      label: const Text('Vider le journal'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Le journal est sauvegardé automatiquement dans la mémoire du téléphone : '
-                  'même si tu fermes l\'application dans la voiture, on pourra le relire en rebranchant le POCO au PC.',
-                  style: TextStyle(color: Retro.grey, fontSize: 11),
-                ),
-              ]),
-              _card('Bilan mécanique enregistré (Trajet réel)', [
-                Text(
-                  'Régime max : ${c.s.maxRpm.toStringAsFixed(0)} tr/min  •  '
-                  'MAF max : ${c.s.maxMaf.toStringAsFixed(1)} g/s',
-                  style: const TextStyle(fontFamily: 'monospace', fontSize: 12.5, color: Retro.white),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Papillon min / max : ${c.s.minThrottle >= 0 ? c.s.minThrottle.toStringAsFixed(1) : "--"} ° / ${c.s.maxThrottle.toStringAsFixed(1)} °',
-                  style: const TextStyle(fontFamily: 'monospace', fontSize: 12.5, color: Retro.silver),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Eau max : ${c.s.maxCoolant.toStringAsFixed(0)} °C  •  '
-                  'Batt min : ${c.s.minBattery > 0 ? c.s.minBattery.toStringAsFixed(2) : "--"} V',
-                  style: const TextStyle(fontFamily: 'monospace', fontSize: 12.5, color: Retro.silver),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Lambda min / max : ${c.s.minLambda.toStringAsFixed(1)} % / +${c.s.maxLambda.toStringAsFixed(1)} %',
-                  style: const TextStyle(fontFamily: 'monospace', fontSize: 12.5, color: Retro.silver),
-                ),
-              ]),
-              _card('Codes défaut moteur (Simos 2 – 0x01)', [
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    FilledButton.icon(
-                      onPressed: canAct && !c.readingFaults ? c.readFaults : null,
-                      icon: const Icon(Icons.search, size: 18),
-                      label: Text(c.readingFaults ? 'Lecture…' : 'Lire les codes défaut'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: canAct
-                          ? () => _confirmAction(
-                                title: 'Effacer les codes défaut moteur ?',
-                                body: 'Envoie la commande KWP1281 (0x05) au calculateur moteur pour vider la mémoire '
-                                    'des défauts et éteindre le voyant.',
-                                confirmLabel: 'Effacer les défauts',
-                                onConfirm: c.clearFaults,
-                              )
-                          : null,
-                      icon: const Icon(Icons.cleaning_services_outlined, size: 18, color: Retro.red),
-                      label: const Text('Effacer les codes (0x05)'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                if (c.faults != null && c.faults!.isEmpty)
-                  const Text('Aucun code défaut mémorisé ✔',
-                      style: TextStyle(color: Retro.green, fontWeight: FontWeight.w700)),
-                if (c.faults != null)
-                  for (final f in c.faults!)
-                    ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: Text(f.code.toString().padLeft(5, '0'),
-                          style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold)),
-                      title: Text(faultLabel(f.code)),
-                      subtitle: Text('Type ${f.status & 0x7F}${(f.status & 0x80) != 0 ? ' – sporadique' : ''}'),
-                    ),
-              ]),
-              _card('Atelier Moteur – ${c.s.profile.headerShort} (${c.s.profile.ecuLabel})', [
-                if (c.serviceMessage != null) ...[
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(10),
-                    margin: const EdgeInsets.only(bottom: 10),
-                    decoration: BoxDecoration(
-                      color: Retro.surfaceElevated,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: c.serviceBusy ? Retro.blue : Retro.green),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          c.serviceMessage!,
-                          style: const TextStyle(color: Retro.white, fontWeight: FontWeight.w700, fontSize: 12.5),
-                        ),
-                        if (c.throttleProgress != null) ...[
-                          const SizedBox(height: 8),
-                          LinearProgressIndicator(
-                            value: c.throttleProgress,
-                            backgroundColor: Retro.border,
-                            color: Retro.blue,
-                          ),
-                        ],
-                        if (c.throttleValues.isNotEmpty) ...[
-                          const SizedBox(height: 6),
-                          Text(
-                            'Groupe ${(c.s.profile.throttleBasicGroup ?? 98).toString().padLeft(3, '0')} : ${c.throttleValues.map((v) => v.display).join("  |  ")}',
-                            style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Retro.silver),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-                if (c.s.profile.throttleBasicGroup != null) ...[
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      '1. Recalibrer le boîtier papillon (Groupe ${c.s.profile.throttleBasicGroup!.toString().padLeft(3, '0')})',
-                      style: Retro.title(13),
-                    ),
-                    subtitle: const Text(
-                      'Corrige le ralenti instable après débranchement batterie ou nettoyage papillon.\n'
-                      '⚠️ À faire MOTEUR COUPÉ, contact mis, sans toucher la pédale d\'accélérateur.',
-                      style: TextStyle(color: Retro.grey, fontSize: 11.5),
-                    ),
-                    trailing: FilledButton(
-                      onPressed: canAct
-                          ? () => _confirmAction(
-                                title:
-                                    'Calibrer le boîtier papillon (Groupe ${c.s.profile.throttleBasicGroup!.toString().padLeft(3, '0')}) ?',
-                                body: 'Conditions obligatoires avant de lancer :\n\n'
-                                    '• Moteur COUPÉ (0 tr/min), contact mis (voyants allumés)\n'
-                                    '• Ne PAS toucher la pédale d\'accélérateur\n'
-                                    '• Température moteur entre 5 et 95 °C\n\n'
-                                    'Le papillon va bouger tout seul en butée min/max pendant ~10 secondes.',
-                                confirmLabel: 'Lancer le calibrage',
-                                onConfirm: c.startThrottleAlign,
-                              )
-                          : null,
-                      child: const Text('Calibrer'),
-                    ),
-                  ),
-                  const Divider(color: Retro.borderSubtle),
-                ],
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text('2. Réinitialiser les auto-adaptations moteur (Canal 00)', style: Retro.title(13)),
-                  subtitle: const Text(
-                    'Remet à zéro les corrections d\'enrichissement (Lambda) et de ralenti apprises par le calculateur '
-                    '(utile après remplacement d\'une sonde, du débitmètre ou réparation d\'une prise d\'air).',
-                    style: TextStyle(color: Retro.grey, fontSize: 11.5),
-                  ),
-                  trailing: OutlinedButton(
-                    onPressed: canAct
-                        ? () => _confirmAction(
-                              title: 'Réinitialiser les auto-adaptations (Canal 00) ?',
-                              body: 'Envoie la commande KWP1281 (0x2A Canal 00) au calculateur Simos 2 pour remettre '
-                                  'les valeurs d\'apprentissage du mélange et du ralenti aux paramètres d\'usine.',
-                              confirmLabel: 'Réinitialiser',
-                              onConfirm: c.resetAdaptations,
-                            )
-                        : null,
-                    child: const Text('RAZ Canal 00'),
-                  ),
-                ),
-              ]),
-              _card('Explorer un groupe de mesures', [
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    SizedBox(
-                      width: 90,
-                      child: TextField(
-                        controller: _groupCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Groupe'),
-                      ),
-                    ),
-                    FilledButton(
-                      onPressed: c.connState == 'connected'
-                          ? () {
-                              final g = int.tryParse(_groupCtrl.text);
-                              if (g != null && g >= 0 && g <= 255) c.explore(g);
-                            }
-                          : null,
-                      child: const Text('Lire en continu'),
-                    ),
-                    if (c.exploreGroup != null)
-                      OutlinedButton(onPressed: () => c.explore(null), child: const Text('Stop')),
-                  ],
-                ),
-              ]),
-              _card('Blocs de mesures (toucher un champ pour l\'affecter)', [
-                if (c.groups.isEmpty && c.groupOk.isEmpty)
-                  const Text('Aucune donnée.', style: TextStyle(color: Retro.grey)),
-                for (final g in ({...c.groups.keys, ...c.groupOk.keys}.toList()..sort()))
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SizedBox(
-                              width: 48,
-                              child: Text(g.toString().padLeft(3, '0'),
-                                  style: const TextStyle(fontFamily: 'monospace', color: Retro.red, fontWeight: FontWeight.w700)),
-                            ),
-                            if (c.groupOk[g] == false || (c.groups[g]?.isEmpty ?? true))
-                              Expanded(
-                                child: Text(
-                                  c.groupRawInfo[g] ?? 'Échec lecture (ok=false)',
-                                  style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: Retro.grey),
-                                ),
-                              )
-                            else
-                              for (var i = 0; i < (c.groups[g]?.length ?? 0); i++)
-                                Expanded(
-                                  child: InkWell(
-                                    onTap: () => _chooseRole(g, i),
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(4),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(c.groups[g]![i].display,
-                                              style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
-                                          Text(
-                                            c.mapping.entries
-                                                .where((e) => e.value == '$g:$i')
-                                                .map((e) => e.key.label)
-                                                .join(', '),
-                                            style: const TextStyle(color: Retro.red, fontSize: 11),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                          ],
-                        ),
-                        if (c.groupF4Raw[g] != null && c.groupF4Raw[g]!.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(left: 48, top: 2),
-                            child: Text(
-                              formatF4Raw(c.groupF4Raw[g]!),
-                              style: const TextStyle(fontFamily: 'monospace', fontSize: 11.5, color: Retro.silver),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-              ]),
-              _card('Journal (${c.logs.length} lignes)', [
-                SizedBox(
-                  height: 220,
-                  child: ListView(
-                    reverse: true,
+      body: SafeArea(
+        top: false,
+        child: ListenableBuilder(
+          listenable: c,
+          builder: (context, _) {
+            return ListView(
+              padding: const EdgeInsets.all(12),
+              children: [
+                _card('Connexion & Export Debug', [
+                  Text('État : ${c.status}'),
+                  if (c.ecuId != null) Text('Calculateur : ${c.ecuId}'),
+                  if (!KLineService.supported)
+                    const Text('Le câble USB ne fonctionne que dans l\'application Android.',
+                        style: TextStyle(color: Retro.grey)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
-                      for (final l in c.logs.reversed)
-                        Text(l, style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: Retro.grey)),
+                      FilledButton.icon(
+                        onPressed: _copyReport,
+                        icon: const Icon(Icons.copy, size: 18),
+                        label: const Text('Copier le rapport complet'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: c.clearLogs,
+                        icon: const Icon(Icons.delete_outline, size: 18),
+                        label: const Text('Vider le journal'),
+                      ),
                     ],
                   ),
-                ),
-              ]),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Le journal est sauvegardé automatiquement dans la mémoire du téléphone : '
+                    'même si tu fermes l\'application dans la voiture, il reste disponible et exportable via le bouton Copier.',
+                    style: TextStyle(color: Retro.grey, fontSize: 11),
+                  ),
+                ]),
+                _card('Bilan mécanique enregistré (Trajet réel)', [
+                  Text(
+                    'Régime max : ${c.s.maxRpm.toStringAsFixed(0)} tr/min  •  '
+                    'MAF max : ${c.s.maxMaf.toStringAsFixed(1)} g/s',
+                    style: const TextStyle(fontFamily: 'monospace', fontSize: 12.5, color: Retro.white),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Papillon min / max : ${c.s.minThrottle >= 0 ? c.s.minThrottle.toStringAsFixed(1) : "--"} ° / ${c.s.maxThrottle.toStringAsFixed(1)} °',
+                    style: const TextStyle(fontFamily: 'monospace', fontSize: 12.5, color: Retro.silver),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Eau max : ${c.s.maxCoolant.toStringAsFixed(0)} °C  •  '
+                    'Batt min : ${c.s.minBattery > 0 ? c.s.minBattery.toStringAsFixed(2) : "--"} V',
+                    style: const TextStyle(fontFamily: 'monospace', fontSize: 12.5, color: Retro.silver),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Lambda min / max : ${c.s.minLambda.toStringAsFixed(1)} % / +${c.s.maxLambda.toStringAsFixed(1)} %',
+                    style: const TextStyle(fontFamily: 'monospace', fontSize: 12.5, color: Retro.silver),
+                  ),
+                ]),
+                _card('Codes défaut moteur (${c.s.profile.ecuLabel} – 0x01)', [
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FilledButton.icon(
+                        onPressed: canAct && !c.readingFaults ? c.readFaults : null,
+                        icon: const Icon(Icons.search, size: 18),
+                        label: Text(c.readingFaults ? 'Lecture…' : 'Lire les codes défaut'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: canAct
+                            ? () => _confirmAction(
+                                  title: 'Effacer les codes défaut moteur ?',
+                                  body: 'Envoie la commande KWP1281 (0x05) au calculateur moteur pour vider la mémoire '
+                                      'des défauts et éteindre le voyant.',
+                                  confirmLabel: 'Effacer les défauts',
+                                  onConfirm: c.clearFaults,
+                                )
+                            : null,
+                        icon: const Icon(Icons.cleaning_services_outlined, size: 18, color: Retro.red),
+                        label: const Text('Effacer les codes (0x05)'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  if (c.faults != null && c.faults!.isEmpty)
+                    const Text('Aucun code défaut mémorisé ✔',
+                        style: TextStyle(color: Retro.green, fontWeight: FontWeight.w700)),
+                  if (c.faults != null)
+                    for (final f in c.faults!)
+                      ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: Text(f.code.toString().padLeft(5, '0'),
+                            style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold)),
+                        title: Text(faultLabel(f.code)),
+                        subtitle: Text('Type ${f.status & 0x7F}${(f.status & 0x80) != 0 ? ' – sporadique' : ''}'),
+                      ),
+                ]),
+                _card('Atelier Moteur – ${c.s.profile.headerShort} (${c.s.profile.ecuLabel})', [
+                  if (c.serviceMessage != null) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      margin: const EdgeInsets.only(bottom: 10),
+                      decoration: BoxDecoration(
+                        color: Retro.surfaceElevated,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: c.serviceBusy ? Retro.blue : Retro.green),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            c.serviceMessage!,
+                            style: const TextStyle(color: Retro.white, fontWeight: FontWeight.w700, fontSize: 12.5),
+                          ),
+                          if (c.throttleProgress != null) ...[
+                            const SizedBox(height: 8),
+                            LinearProgressIndicator(
+                              value: c.throttleProgress,
+                              backgroundColor: Retro.border,
+                              color: Retro.blue,
+                            ),
+                          ],
+                          if (c.throttleValues.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              'Groupe ${(c.s.profile.throttleBasicGroup ?? 98).toString().padLeft(3, '0')} : ${c.throttleValues.map((v) => v.display).join("  |  ")}',
+                              style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Retro.silver),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                  if (c.s.profile.throttleBasicGroup != null) ...[
+                    _workshopAction(
+                      title:
+                          '1. Recalibrer le boîtier papillon (Groupe ${c.s.profile.throttleBasicGroup!.toString().padLeft(3, '0')})',
+                      subtitle:
+                          'Corrige le ralenti instable après débranchement batterie ou nettoyage papillon.\n'
+                          '⚠️ À faire MOTEUR COUPÉ, contact mis, sans toucher la pédale d\'accélérateur.',
+                      button: FilledButton(
+                        onPressed: canAct
+                            ? () => _confirmAction(
+                                  title:
+                                      'Calibrer le boîtier papillon (Groupe ${c.s.profile.throttleBasicGroup!.toString().padLeft(3, '0')}) ?',
+                                  body: 'Conditions obligatoires avant de lancer :\n\n'
+                                      '• Moteur COUPÉ (0 tr/min), contact mis (voyants allumés)\n'
+                                      '• Ne PAS toucher la pédale d\'accélérateur\n'
+                                      '• Température moteur entre 5 et 95 °C\n\n'
+                                      'Le papillon va bouger tout seul en butée min/max pendant ~10 secondes.',
+                                  confirmLabel: 'Lancer le calibrage',
+                                  onConfirm: c.startThrottleAlign,
+                                )
+                            : null,
+                        child: const Text('Calibrer'),
+                      ),
+                    ),
+                    const Divider(color: Retro.borderSubtle, height: 20),
+                  ],
+                  _workshopAction(
+                    title: '2. Réinitialiser les auto-adaptations moteur (Canal 00)',
+                    subtitle:
+                        'Remet à zéro les corrections d\'enrichissement (Lambda) et de ralenti apprises par le calculateur '
+                        '(utile après remplacement d\'une sonde, du débitmètre ou réparation d\'une prise d\'air).',
+                    button: OutlinedButton(
+                      onPressed: canAct
+                          ? () => _confirmAction(
+                                title: 'Réinitialiser les auto-adaptations (Canal 00) ?',
+                                body: 'Envoie la commande KWP1281 (0x2A Canal 00) au calculateur moteur '
+                                    '(${c.s.profile.ecuLabel}) pour remettre les valeurs d\'apprentissage du mélange '
+                                    'et du ralenti aux paramètres d\'usine.',
+                                confirmLabel: 'Réinitialiser',
+                                onConfirm: c.resetAdaptations,
+                              )
+                          : null,
+                      child: const Text('RAZ Canal 00'),
+                    ),
+                  ),
+                ]),
+                _card('Explorer un groupe de mesures', [
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 90,
+                        child: TextField(
+                          controller: _groupCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(labelText: 'Groupe'),
+                        ),
+                      ),
+                      FilledButton(
+                        onPressed: c.connState == 'connected'
+                            ? () {
+                                final g = int.tryParse(_groupCtrl.text);
+                                if (g != null && g >= 0 && g <= 255) c.explore(g);
+                              }
+                            : null,
+                        child: const Text('Lire en continu'),
+                      ),
+                      if (c.exploreGroup != null)
+                        OutlinedButton(onPressed: () => c.explore(null), child: const Text('Stop')),
+                    ],
+                  ),
+                ]),
+                _card('Blocs de mesures (toucher un champ pour l\'affecter)', [
+                  if (c.groups.isEmpty && c.groupOk.isEmpty)
+                    const Text('Aucune donnée.', style: TextStyle(color: Retro.grey)),
+                  for (final g in ({...c.groups.keys, ...c.groupOk.keys}.toList()..sort()))
+                    _groupBlock(c, g),
+                ]),
+                _card('Journal (${c.logs.length} lignes)', [
+                  SizedBox(
+                    height: 220,
+                    child: ListView(
+                      reverse: true,
+                      children: [
+                        for (final l in c.logs.reversed)
+                          Text(l, style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: Retro.grey)),
+                      ],
+                    ),
+                  ),
+                ]),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _workshopAction({
+    required String title,
+    required String subtitle,
+    required Widget button,
+  }) {
+    return LayoutBuilder(
+      builder: (context, box) {
+        final textCol = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: Retro.title(13)),
+            const SizedBox(height: 4),
+            Text(subtitle, style: const TextStyle(color: Retro.grey, fontSize: 11.5, height: 1.35)),
+          ],
+        );
+        if (box.maxWidth >= 460) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(child: textCol),
+              const SizedBox(width: 12),
+              button,
             ],
           );
-        },
-      ),
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            textCol,
+            const SizedBox(height: 10),
+            Align(alignment: Alignment.centerRight, child: button),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _groupBlock(DashboardController c, int g) {
+    final fields = c.groups[g];
+    final failed = c.groupOk[g] == false || (fields?.isEmpty ?? true);
+
+    Widget cell(int i) {
+      final roles = c.mapping.entries
+          .where((e) => e.value == '$g:$i')
+          .map((e) => e.key.label)
+          .join(', ');
+      return InkWell(
+        onTap: () => _chooseRole(g, i),
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+          decoration: BoxDecoration(
+            color: Retro.surfaceElevated,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: Retro.borderSubtle),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  fields![i].display,
+                  maxLines: 1,
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 12.5, color: Retro.white),
+                ),
+              ),
+              if (roles.isNotEmpty)
+                Text(
+                  roles,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Retro.red, fontSize: 10.5, fontWeight: FontWeight.w600),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, box) {
+        final narrow = box.maxWidth < 420;
+        final badge = Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+          decoration: BoxDecoration(
+            color: Retro.red.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(5),
+          ),
+          child: Text(
+            g.toString().padLeft(3, '0'),
+            style: const TextStyle(fontFamily: 'monospace', color: Retro.red, fontWeight: FontWeight.w700, fontSize: 12),
+          ),
+        );
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (failed)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    badge,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        c.groupRawInfo[g] ?? 'Échec lecture (ok=false)',
+                        style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: Retro.grey),
+                      ),
+                    ),
+                  ],
+                )
+              else if (narrow) ...[
+                badge,
+                const SizedBox(height: 6),
+                for (var row = 0; row < fields!.length; row += 2) ...[
+                  if (row > 0) const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(child: cell(row)),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: row + 1 < fields.length ? cell(row + 1) : const SizedBox.shrink(),
+                      ),
+                    ],
+                  ),
+                ],
+              ] else
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    badge,
+                    const SizedBox(width: 8),
+                    for (var i = 0; i < fields!.length; i++) ...[
+                      if (i > 0) const SizedBox(width: 6),
+                      Expanded(child: cell(i)),
+                    ],
+                  ],
+                ),
+              if (c.groupF4Raw[g] != null && c.groupF4Raw[g]!.isNotEmpty)
+                Padding(
+                  padding: EdgeInsets.only(left: narrow ? 0 : 46, top: 4),
+                  child: Text(
+                    formatF4Raw(c.groupF4Raw[g]!),
+                    style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: Retro.silver),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 

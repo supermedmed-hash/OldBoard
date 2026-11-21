@@ -31,16 +31,23 @@ class DashboardScreen extends StatelessWidget {
             return LayoutBuilder(
               builder: (context, box) {
                 final isLandscape = box.maxWidth > box.maxHeight;
+                final compactW = box.maxWidth < 360;
+                final compactH = box.maxHeight < 430;
+                final gap = compactW || compactH ? 6.0 : 8.0;
+                final padH = compactW ? 6.0 : 10.0;
+                final padV = compactH ? 4.0 : 6.0;
                 return Column(
                   children: [
-                    _topHeader(),
+                    _topHeader(box.maxWidth, compactH),
                     Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-                        child: isLandscape ? _landscapeBody(context) : _portraitBody(context),
+                        padding: EdgeInsets.fromLTRB(padH, padV, padH, padV),
+                        child: isLandscape
+                            ? _landscapeBody(context, gap)
+                            : _portraitBody(context, gap),
                       ),
                     ),
-                    _bottomBar(context),
+                    _bottomBar(context, box.maxWidth, compactH),
                   ],
                 );
               },
@@ -52,7 +59,7 @@ class DashboardScreen extends StatelessWidget {
   }
 
   // ------------------------------------------------------------------ EN-TÊTE + LÉGENDE COULEURS
-  Widget _topHeader() {
+  Widget _topHeader(double maxWidth, bool compactH) {
     final now = DateTime.now();
     final clock = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
 
@@ -65,65 +72,119 @@ class DashboardScreen extends StatelessWidget {
     };
 
     final prof = c.s.profile;
+    final compactW = maxWidth < 360;
+    final showInlineLegend = maxWidth >= 520;
+    final showSubLegend = !showInlineLegend && !compactH;
+
     return Container(
-      height: 44,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: const BoxDecoration(
         color: Retro.bg,
         border: Border(bottom: BorderSide(color: Retro.borderSubtle, width: 1)),
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          BrandEmblem(brand: prof.brand, accent: prof.accent, size: 26),
-          const SizedBox(width: 8),
-          Container(width: 2, height: 15, color: prof.accent),
-          const SizedBox(width: 8),
-          Text(
-            prof.headerShort,
-            style: const TextStyle(
-              color: Retro.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.9,
-            ),
-          ),
-          const Spacer(),
-          // Légende claire Bleu = Bas / Rouge = Haut
-          _legendChip(Retro.blue, 'BAS'),
-          const SizedBox(width: 6),
-          _legendChip(Retro.green, 'OK'),
-          const SizedBox(width: 6),
-          _legendChip(Retro.red, 'HAUT'),
-          const SizedBox(width: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-            decoration: BoxDecoration(
-              color: Retro.surface,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Retro.border, width: 1),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(width: 7, height: 7, decoration: BoxDecoration(shape: BoxShape.circle, color: dotColor)),
-                const SizedBox(width: 6),
-                Text(
-                  c.status.toUpperCase(),
-                  style: const TextStyle(
-                    color: Retro.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.6,
+          ConstrainedBox(
+            constraints: BoxConstraints(minHeight: compactH ? 36 : 42),
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: compactW ? 8 : 12, vertical: compactH ? 4 : 6),
+              child: Row(
+                children: [
+                  BrandEmblem(brand: prof.brand, accent: prof.accent, size: compactW ? 22 : 25),
+                  SizedBox(width: compactW ? 6 : 8),
+                  Container(width: 2, height: 14, color: prof.accent),
+                  SizedBox(width: compactW ? 6 : 8),
+                  Expanded(
+                    flex: 4,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        prof.headerShort,
+                        maxLines: 1,
+                        style: TextStyle(
+                          color: Retro.white,
+                          fontSize: compactW ? 12 : 13,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.7,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                  if (showInlineLegend) ...[
+                    const SizedBox(width: 8),
+                    _legendChip(Retro.blue, 'BAS'),
+                    const SizedBox(width: 6),
+                    _legendChip(Retro.green, 'OK'),
+                    const SizedBox(width: 6),
+                    _legendChip(Retro.red, 'HAUT'),
+                  ],
+                  SizedBox(width: compactW ? 6 : 8),
+                  Expanded(
+                    flex: 5,
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: compactW ? 7 : 9, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Retro.surface,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Retro.border, width: 1),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(width: 7, height: 7, decoration: BoxDecoration(shape: BoxShape.circle, color: dotColor)),
+                            const SizedBox(width: 5),
+                            Flexible(
+                              child: Text(
+                                c.status.toUpperCase(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Retro.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: compactW ? 6 : 10),
+                  Text(
+                    clock,
+                    style: Retro.num(compactW ? 12 : 13, w: FontWeight.w700, c: Retro.white, letterSpacing: 0.4),
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(width: 10),
-          Text(
-            clock,
-            style: Retro.num(13, w: FontWeight.w700, c: Retro.white, letterSpacing: 0.4),
-          ),
+          if (showSubLegend)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+              decoration: const BoxDecoration(
+                color: Retro.surface,
+                border: Border(top: BorderSide(color: Retro.borderSubtle, width: 1)),
+              ),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _legendChip(Retro.blue, 'TROP BAS'),
+                    const SizedBox(width: 14),
+                    _legendChip(Retro.green, 'DANS LES COTES'),
+                    const SizedBox(width: 14),
+                    _legendChip(Retro.red, 'TROP HAUT'),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -134,42 +195,42 @@ class DashboardScreen extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(width: 7, height: 7, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-        const SizedBox(width: 3),
+        const SizedBox(width: 4),
         Text(
           text,
-          style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.4),
+          style: TextStyle(color: color, fontSize: 9.5, fontWeight: FontWeight.w800, letterSpacing: 0.4),
         ),
       ],
     );
   }
 
   // ------------------------------------------------------------------ DISPOSITION PORTRAIT
-  Widget _portraitBody(BuildContext context) {
+  Widget _portraitBody(BuildContext context, double gap) {
     return Column(
       children: [
         Expanded(
-          flex: 34,
+          flex: 35,
           child: Row(
             children: [
               Expanded(child: _consoHeroCard()),
-              const SizedBox(width: 8),
+              SizedBox(width: gap),
               Expanded(child: _rangeHeroCard()),
             ],
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: gap),
         Expanded(
-          flex: 23,
-          child: _tempsAndElecRow(),
+          flex: 22,
+          child: _tempsAndElecRow(gap),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: gap),
         Expanded(
-          flex: 23,
-          child: _engineTelemetryRow(),
+          flex: 22,
+          child: _engineTelemetryRow(gap),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: gap),
         Expanded(
-          flex: 20,
+          flex: 21,
           child: _tripRow(),
         ),
       ],
@@ -177,7 +238,7 @@ class DashboardScreen extends StatelessWidget {
   }
 
   // ------------------------------------------------------------------ DISPOSITION PAYSAGE
-  Widget _landscapeBody(BuildContext context) {
+  Widget _landscapeBody(BuildContext context, double gap) {
     return Row(
       children: [
         Expanded(
@@ -189,24 +250,24 @@ class DashboardScreen extends StatelessWidget {
                 child: Row(
                   children: [
                     Expanded(child: _consoHeroCard()),
-                    const SizedBox(width: 8),
+                    SizedBox(width: gap),
                     Expanded(child: _rangeHeroCard()),
                   ],
                 ),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: gap),
               Expanded(flex: 40, child: _tripRow()),
             ],
           ),
         ),
-        const SizedBox(width: 8),
+        SizedBox(width: gap),
         Expanded(
           flex: 48,
           child: Column(
             children: [
-              Expanded(child: _tempsAndElecRow()),
-              const SizedBox(height: 8),
-              Expanded(child: _engineTelemetryRow()),
+              Expanded(child: _tempsAndElecRow(gap)),
+              SizedBox(height: gap),
+              Expanded(child: _engineTelemetryRow(gap)),
             ],
           ),
         ),
@@ -249,7 +310,7 @@ class DashboardScreen extends StatelessWidget {
               ? 'COTE ${prof.consoMin.toStringAsFixed(1)}–${prof.consoMax.toStringAsFixed(1)}'
               : 'RALENTI ${prof.idleLphMin.toStringAsFixed(1)}–${prof.idleLphMax.toStringAsFixed(1)}'),
       status: status,
-      child: Column(
+      builder: (compactH) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -271,9 +332,10 @@ class DashboardScreen extends StatelessWidget {
           _segmentedBar(
             fraction: barFrac,
             segments: 20,
+            height: compactH ? 4.5 : 6,
             activeColor: status == RangeStatus.normal ? Retro.white : Retro.valueColor(status),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: compactH ? 4 : 8),
           Row(
             children: [
               Expanded(
@@ -283,8 +345,9 @@ class DashboardScreen extends StatelessWidget {
                   _check(c.tripAvgL100 > 0 ? c.tripAvgL100 : null, 4.5, 10.5),
                 ),
               ),
-              Container(width: 1, height: 24, color: Retro.border),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
+              Container(width: 1, height: compactH ? 20 : 24, color: Retro.border),
+              const SizedBox(width: 6),
               Expanded(
                 child: _subMetric(
                   'DÉBIT DIRECT',
@@ -308,7 +371,7 @@ class DashboardScreen extends StatelessWidget {
       title: 'AUTONOMIE',
       spec: '${(frac * 100).toStringAsFixed(0)}% RÉSERVOIR',
       status: status,
-      child: Column(
+      builder: (compactH) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -330,9 +393,10 @@ class DashboardScreen extends StatelessWidget {
           _segmentedBar(
             fraction: frac,
             segments: 20,
+            height: compactH ? 4.5 : 6,
             activeColor: status == RangeStatus.low ? Retro.blue : c.s.profile.accent,
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: compactH ? 4 : 8),
           Row(
             children: [
               Expanded(
@@ -342,8 +406,9 @@ class DashboardScreen extends StatelessWidget {
                   status,
                 ),
               ),
-              Container(width: 1, height: 24, color: Retro.border),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
+              Container(width: 1, height: compactH ? 20 : 24, color: Retro.border),
+              const SizedBox(width: 6),
               Expanded(
                 child: _subMetric(
                   'CONSO TRAJET',
@@ -364,8 +429,9 @@ class DashboardScreen extends StatelessWidget {
       alignment: Alignment.centerLeft,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(label, style: Retro.title(10, c: Retro.silver, w: FontWeight.w700)),
+          Text(label, style: Retro.title(9.5, c: Retro.silver, w: FontWeight.w700)),
           const SizedBox(height: 2),
           Text(value, style: Retro.num(13.5, w: FontWeight.w700, c: Retro.valueColor(status), letterSpacing: -0.2)),
         ],
@@ -374,7 +440,7 @@ class DashboardScreen extends StatelessWidget {
   }
 
   // ------------------------------------------------------------------ TEMPÉRATURES MOTEUR & ÉLECTRICITÉ
-  Widget _tempsAndElecRow() {
+  Widget _tempsAndElecRow(double gap) {
     final coolant = c.data.get(EngineRole.coolant);
     final oil = c.data.get(EngineRole.oilTemp);
     final iat = c.data.get(EngineRole.intakeAir);
@@ -428,7 +494,7 @@ class DashboardScreen extends StatelessWidget {
             status: coolantStatus,
           ),
         ),
-        const SizedBox(width: 8),
+        SizedBox(width: gap),
         Expanded(
           child: _metricTile(
             label: hasOil ? 'TEMP. HUILE' : 'AIR ADMISSION',
@@ -438,7 +504,7 @@ class DashboardScreen extends StatelessWidget {
             status: secondStatus,
           ),
         ),
-        const SizedBox(width: 8),
+        SizedBox(width: gap),
         Expanded(
           child: _metricTile(
             label: 'BATTERIE',
@@ -453,7 +519,7 @@ class DashboardScreen extends StatelessWidget {
   }
 
   // ------------------------------------------------------------------ TÉLÉMÉTRIE MOTEUR (ESSENCE / TURBO / DIESEL TDI)
-  Widget _engineTelemetryRow() {
+  Widget _engineTelemetryRow(double gap) {
     final prof = c.s.profile;
     final inj = c.data.get(EngineRole.injection);
     final map = c.data.get(EngineRole.map);
@@ -479,7 +545,7 @@ class DashboardScreen extends StatelessWidget {
               status: mgStatus,
             ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: gap),
           Expanded(
             child: _metricTile(
               label: 'TURBO (GRP 11)',
@@ -489,7 +555,7 @@ class DashboardScreen extends StatelessWidget {
               status: boostStatus,
             ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: gap),
           Expanded(
             child: _metricTile(
               label: maf != null ? 'DÉBIT AIR (MAF)' : 'PÉDALE',
@@ -578,7 +644,7 @@ class DashboardScreen extends StatelessWidget {
             status: injStatus,
           ),
         ),
-        const SizedBox(width: 8),
+        SizedBox(width: gap),
         Expanded(
           child: _metricTile(
             label: 'LAMBDA (G39)',
@@ -588,7 +654,7 @@ class DashboardScreen extends StatelessWidget {
             status: lamStatus,
           ),
         ),
-        const SizedBox(width: 8),
+        SizedBox(width: gap),
         Expanded(
           child: _metricTile(
             label: thirdLabel,
@@ -608,64 +674,82 @@ class DashboardScreen extends StatelessWidget {
     final dur = '${secs ~/ 3600}h${((secs % 3600) ~/ 60).toString().padLeft(2, '0')}';
     final avgStatus = _check(c.tripAvgL100 > 0 ? c.tripAvgL100 : null, 4.5, 10.5);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-      decoration: BoxDecoration(
-        color: Retro.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Retro.border, width: 1.2),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
+    return LayoutBuilder(
+      builder: (context, box) {
+        final tightH = box.maxHeight < 95;
+        final tightW = box.maxWidth < 360;
+        final divMargin = tightW ? 5.0 : 10.0;
+
+        return Container(
+          padding: EdgeInsets.symmetric(horizontal: tightW ? 10 : 14, vertical: tightH ? 5 : 9),
+          decoration: BoxDecoration(
+            color: Retro.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Retro.border, width: 1.2),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(width: 7, height: 7, decoration: BoxDecoration(color: c.s.profile.accent, shape: BoxShape.circle)),
-              const SizedBox(width: 8),
-              Text('ORDINATEUR DE TRAJET', style: Retro.title(12, c: Retro.titleWhite)),
-              const Spacer(),
-              InkWell(
-                onTap: c.resetTrip,
-                borderRadius: BorderRadius.circular(6),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: Retro.surfaceElevated,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: Retro.border, width: 1),
+              Row(
+                children: [
+                  Container(width: 7, height: 7, decoration: BoxDecoration(color: c.s.profile.accent, shape: BoxShape.circle)),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'ORDINATEUR DE TRAJET',
+                        maxLines: 1,
+                        style: Retro.title(12, c: Retro.titleWhite),
+                      ),
+                    ),
                   ),
-                  child: Text('REMISE À ZÉRO', style: Retro.title(10, c: Retro.white)),
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: c.resetTrip,
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: tightW ? 7 : 10, vertical: tightH ? 2 : 3),
+                      decoration: BoxDecoration(
+                        color: Retro.surfaceElevated,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Retro.border, width: 1),
+                      ),
+                      child: Text('REMISE À ZÉRO', style: Retro.title(9.5, c: Retro.white)),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: tightH ? 3 : 6),
+              Expanded(
+                child: Row(
+                  children: [
+                    _tripStat('DISTANCE', _f(c.s.tripKm, 1), 'km', RangeStatus.normal),
+                    _verticalDivider(divMargin),
+                    _tripStat('DURÉE', dur, '', RangeStatus.normal),
+                    _verticalDivider(divMargin),
+                    _tripStat(
+                      'MOYENNE',
+                      c.tripAvgL100 > 0 ? c.tripAvgL100.toStringAsFixed(1) : '—',
+                      'L/100',
+                      avgStatus,
+                    ),
+                    _verticalDivider(divMargin),
+                    _tripStat('CARBURANT', c.s.tripFuel.toStringAsFixed(2), 'L', RangeStatus.normal),
+                  ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          Expanded(
-            child: Row(
-              children: [
-                _tripStat('DISTANCE', _f(c.s.tripKm, 1), 'km', RangeStatus.normal),
-                _verticalDivider(),
-                _tripStat('DURÉE', dur, '', RangeStatus.normal),
-                _verticalDivider(),
-                _tripStat(
-                  'MOYENNE',
-                  c.tripAvgL100 > 0 ? c.tripAvgL100.toStringAsFixed(1) : '—',
-                  'L/100',
-                  avgStatus,
-                ),
-                _verticalDivider(),
-                _tripStat('CARBURANT', c.s.tripFuel.toStringAsFixed(2), 'L', RangeStatus.normal),
-              ],
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _verticalDivider() => Container(
+  Widget _verticalDivider([double marginH = 10]) => Container(
         width: 1,
-        margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        margin: EdgeInsets.symmetric(horizontal: marginH, vertical: 3),
         color: Retro.border,
       );
 
@@ -678,6 +762,7 @@ class DashboardScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Text(label, style: Retro.title(10.5, c: Retro.silver, w: FontWeight.w800)),
             const SizedBox(height: 3),
@@ -703,7 +788,7 @@ class DashboardScreen extends StatelessWidget {
     required String title,
     required String spec,
     required RangeStatus status,
-    required Widget child,
+    required Widget Function(bool compactH) builder,
   }) {
     final borderCol = Retro.borderColor(status);
     final topBarCol = switch (status) {
@@ -713,47 +798,92 @@ class DashboardScreen extends StatelessWidget {
       RangeStatus.unknown => c.s.profile.accent,
     };
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Retro.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: borderCol,
-          width: status == RangeStatus.low || status == RangeStatus.high ? 1.8 : 1.2,
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(height: 3, color: topBarCol),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Retro.title(13, c: Retro.titleWhite),
-                        ),
-                      ),
-                      _statusBadge(spec, status),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Expanded(child: child),
-                ],
-              ),
+    return LayoutBuilder(
+      builder: (context, box) {
+        final narrowCard = box.maxWidth < 235;
+        final compactH = box.maxHeight < 145;
+        final stackHeader = narrowCard && !compactH;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: Retro.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: borderCol,
+              width: status == RangeStatus.low || status == RangeStatus.high ? 1.8 : 1.2,
             ),
           ),
-        ],
-      ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(height: 3, color: topBarCol),
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    narrowCard ? 10 : 12,
+                    compactH ? 6 : 9,
+                    narrowCard ? 10 : 12,
+                    compactH ? 6 : 9,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (stackHeader) ...[
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            title,
+                            maxLines: 1,
+                            style: Retro.title(13, c: Retro.titleWhite),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: _statusBadge(spec, status),
+                          ),
+                        ),
+                      ] else
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 5,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  title,
+                                  maxLines: 1,
+                                  style: Retro.title(12.5, c: Retro.titleWhite),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              flex: 5,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerRight,
+                                child: _statusBadge(spec, status),
+                              ),
+                            ),
+                          ],
+                        ),
+                      SizedBox(height: compactH ? 2 : 4),
+                      Expanded(child: builder(compactH)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -770,7 +900,7 @@ class DashboardScreen extends StatelessWidget {
       _ => Retro.surfaceElevated,
     };
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+      padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 2),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(5),
@@ -778,7 +908,8 @@ class DashboardScreen extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: col, letterSpacing: 0.3),
+        maxLines: 1,
+        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, color: col, letterSpacing: 0.3),
       ),
     );
   }
@@ -787,24 +918,20 @@ class DashboardScreen extends StatelessWidget {
     required double fraction,
     required int segments,
     required Color activeColor,
+    double height = 6,
   }) {
     final activeCount = (fraction.clamp(0.0, 1.0) * segments).round();
-    return SizedBox(
-      height: 6,
-      child: Row(
-        children: [
-          for (var i = 0; i < segments; i++) ...[
-            if (i > 0) const SizedBox(width: 2),
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: i < activeCount ? activeColor : const Color(0xFF1F212A),
-                  borderRadius: BorderRadius.circular(1.5),
-                ),
-              ),
-            ),
-          ],
-        ],
+    return RepaintBoundary(
+      child: SizedBox(
+        height: height,
+        width: double.infinity,
+        child: CustomPaint(
+          painter: _SegmentedBarPainter(
+            segments: segments,
+            activeCount: activeCount,
+            activeColor: activeColor,
+          ),
+        ),
       ),
     );
   }
@@ -821,157 +948,190 @@ class DashboardScreen extends StatelessWidget {
     final dotCol = Retro.indicatorColor(status);
     final isOut = status == RangeStatus.low || status == RangeStatus.high;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Retro.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderCol, width: isOut ? 1.8 : 1.2),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Bandeau de titre très lisible à contraste élevé
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: isOut ? valCol.withValues(alpha: 0.14) : Retro.surfaceHeader,
-              border: const Border(bottom: BorderSide(color: Retro.borderSubtle, width: 1)),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      style: Retro.title(12.5, c: Retro.titleWhite),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(color: dotCol, shape: BoxShape.circle),
-                ),
-              ],
-            ),
+    return LayoutBuilder(
+      builder: (context, box) {
+        final tightW = box.maxWidth < 110;
+        final tightH = box.maxHeight < 95;
+        final hPad = tightW ? 7.0 : 10.0;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: Retro.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: borderCol, width: isOut ? 1.8 : 1.2),
           ),
-          // Valeur + Sous-texte de cote
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(10, 6, 10, 7),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          Text(value, style: Retro.num(34, w: FontWeight.w800, c: valCol)),
-                          if (unit.isNotEmpty) ...[
-                            const SizedBox(width: 5),
-                            Text(unit, style: Retro.title(13, c: isOut ? valCol : Retro.silver)),
-                          ],
-                        ],
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Bandeau de titre très lisible à contraste élevé
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: hPad, vertical: tightH ? 3.5 : 6),
+                decoration: BoxDecoration(
+                  color: isOut ? valCol.withValues(alpha: 0.14) : Retro.surfaceHeader,
+                  border: const Border(bottom: BorderSide(color: Retro.borderSubtle, width: 1)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          label,
+                          maxLines: 1,
+                          style: Retro.title(12.5, c: Retro.titleWhite),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      sub,
-                      maxLines: 1,
-                      style: TextStyle(
-                        color: isOut ? valCol : Retro.silver,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.3,
-                      ),
+                    const SizedBox(width: 5),
+                    Container(
+                      width: 7.5,
+                      height: 7.5,
+                      decoration: BoxDecoration(color: dotCol, shape: BoxShape.circle),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
+              // Valeur + Sous-texte de cote
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(hPad, tightH ? 3 : 6, hPad, tightH ? 4 : 7),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Text(value, style: Retro.num(34, w: FontWeight.w800, c: valCol)),
+                              if (unit.isNotEmpty) ...[
+                                const SizedBox(width: 4),
+                                Text(unit, style: Retro.title(13, c: isOut ? valCol : Retro.silver)),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          sub,
+                          maxLines: 1,
+                          style: TextStyle(
+                            color: isOut ? valCol : Retro.silver,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
   // ------------------------------------------------------------------ BARRE D'ACTIONS BAS
-  Widget _bottomBar(BuildContext context) {
+  Widget _bottomBar(BuildContext context, double maxWidth, bool compactH) {
     final carOn = c.mode == SourceMode.car;
     final simOn = c.mode == SourceMode.sim;
-    return Container(
-      height: 50,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: const BoxDecoration(
-        color: Retro.bg,
-        border: Border(top: BorderSide(color: Retro.borderSubtle, width: 1)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _actionBtn(
-              carOn ? 'STOP USB' : 'CÂBLE USB',
-              carOn ? c.disconnectCar : c.connectCar,
-              active: carOn,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _actionBtn(
-              simOn ? 'STOP SIMU' : 'SIMULATION',
-              simOn ? c.stopSim : c.startSim,
-              active: simOn,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _actionBtn('PLEIN', () => showRefuelDialog(context, c)),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _actionBtn(
-              'DIAGNOSTIC',
-              () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => DiagScreen(c: c))),
-            ),
-          ),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 40,
-            height: 36,
-            child: OutlinedButton(
-              onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SettingsScreen(c: c))),
-              style: OutlinedButton.styleFrom(
-                padding: EdgeInsets.zero,
-                backgroundColor: Retro.surface,
-                side: const BorderSide(color: Retro.border),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    final compactW = maxWidth < 360;
+    final gap = compactW ? 5.0 : 8.0;
+    final btnH = compactH ? 32.0 : 36.0;
+
+    return RepaintBoundary(
+      child: Container(
+        height: compactH ? 42 : 50,
+        padding: EdgeInsets.symmetric(horizontal: compactW ? 6 : 10, vertical: compactH ? 5 : 7),
+        decoration: const BoxDecoration(
+          color: Retro.bg,
+          border: Border(top: BorderSide(color: Retro.borderSubtle, width: 1)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: _actionBtn(
+                carOn ? 'STOP USB' : 'CÂBLE USB',
+                carOn ? c.disconnectCar : c.connectCar,
+                active: carOn,
+                height: btnH,
+                compactW: compactW,
               ),
-              child: const Icon(Icons.tune_rounded, size: 18, color: Retro.white),
             ),
-          ),
-        ],
+            SizedBox(width: gap),
+            Expanded(
+              child: _actionBtn(
+                simOn ? 'STOP SIMU' : 'SIMULATION',
+                simOn ? c.stopSim : c.startSim,
+                active: simOn,
+                height: btnH,
+                compactW: compactW,
+              ),
+            ),
+            SizedBox(width: gap),
+            Expanded(
+              child: _actionBtn(
+                'PLEIN',
+                () => showRefuelDialog(context, c),
+                height: btnH,
+                compactW: compactW,
+              ),
+            ),
+            SizedBox(width: gap),
+            Expanded(
+              child: _actionBtn(
+                'DIAGNOSTIC',
+                () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => DiagScreen(c: c))),
+                height: btnH,
+                compactW: compactW,
+              ),
+            ),
+            SizedBox(width: gap),
+            SizedBox(
+              width: compactW ? 36 : 40,
+              height: btnH,
+              child: OutlinedButton(
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SettingsScreen(c: c))),
+                style: OutlinedButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  backgroundColor: Retro.surface,
+                  side: const BorderSide(color: Retro.border),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Icon(Icons.tune_rounded, size: 18, color: Retro.white),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _actionBtn(String label, VoidCallback onTap, {bool active = false}) {
+  Widget _actionBtn(
+    String label,
+    VoidCallback onTap, {
+    bool active = false,
+    double height = 36,
+    bool compactW = false,
+  }) {
     final accent = c.s.profile.accent;
     return SizedBox(
-      height: 36,
+      height: height,
       child: OutlinedButton(
         onPressed: onTap,
         style: OutlinedButton.styleFrom(
@@ -979,13 +1139,16 @@ class DashboardScreen extends StatelessWidget {
           backgroundColor: active ? accent : Retro.surface,
           side: BorderSide(color: active ? accent : Retro.border, width: 1.2),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          padding: const EdgeInsets.symmetric(horizontal: 6),
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          padding: EdgeInsets.symmetric(horizontal: compactW ? 4 : 6),
         ),
         child: FittedBox(
           fit: BoxFit.scaleDown,
           child: Text(
             label,
-            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: 0.8),
+            maxLines: 1,
+            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: 0.6),
           ),
         ),
       ),
@@ -1037,4 +1200,40 @@ Future<void> showRefuelDialog(BuildContext context, DashboardController c) async
   if (res != null && context.mounted) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res)));
   }
+}
+
+class _SegmentedBarPainter extends CustomPainter {
+  const _SegmentedBarPainter({
+    required this.segments,
+    required this.activeCount,
+    required this.activeColor,
+  });
+
+  final int segments;
+  final int activeCount;
+  final Color activeColor;
+
+  static const _inactiveColor = Color(0xFF1F212A);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (segments <= 0 || size.width <= 0 || size.height <= 0) return;
+    const gap = 2.0;
+    final segW = (size.width - gap * (segments - 1)) / segments;
+    if (segW <= 0) return;
+    final activePaint = Paint()..color = activeColor;
+    final inactivePaint = Paint()..color = _inactiveColor;
+    const radius = Radius.circular(1.5);
+    for (var i = 0; i < segments; i++) {
+      final left = i * (segW + gap);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(Rect.fromLTWH(left, 0, segW, size.height), radius),
+        i < activeCount ? activePaint : inactivePaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SegmentedBarPainter old) =>
+      old.activeCount != activeCount || old.activeColor != activeColor || old.segments != segments;
 }

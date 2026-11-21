@@ -62,9 +62,14 @@ class DashboardController extends ChangeNotifier {
   bool isCutoff = false;
 
   Timer? _tick;
+  Timer? _logSaveTimer;
+  Timer? _logUiTimer;
   StreamSubscription? _ev;
   final Stopwatch _sw = Stopwatch();
   double _saveAcc = 0;
+  double _carUiAcc = 0;
+  int _lastClockMinute = -1;
+  Map<int, List<(EngineRole, int)>> _groupRoleLookup = {};
 
   List<int> get discoveryGroups => s.profile.discoveryGroups;
 
@@ -74,6 +79,7 @@ class DashboardController extends ChangeNotifier {
     if (s.savedLogs.isNotEmpty) {
       logs.addAll(s.savedLogs);
     }
+    _lastClockMinute = DateTime.now().minute;
     _ev = kline.events.listen(_onEvent);
     _sw.start();
     _tick = Timer.periodic(const Duration(milliseconds: 100), (_) => _onTick());
@@ -88,9 +94,44 @@ class DashboardController extends ChangeNotifier {
   @override
   void dispose() {
     _tick?.cancel();
+    _clusterTimeout?.cancel();
+    _logUiTimer?.cancel();
+    if (_logSaveTimer != null) {
+      _logSaveTimer!.cancel();
+      _logSaveTimer = null;
+      s.saveLogs(logs);
+    }
     _ev?.cancel();
     s.saveMemories();
     super.dispose();
+  }
+
+  void _scheduleLogSave() {
+    _logSaveTimer ??= Timer(const Duration(seconds: 2), () {
+      _logSaveTimer = null;
+      s.saveLogs(logs);
+    });
+  }
+
+  void _notifyLogsThrottled() {
+    _logUiTimer ??= Timer(const Duration(milliseconds: 250), () {
+      _logUiTimer = null;
+      notifyListeners();
+    });
+  }
+
+  void _rebuildGroupLookup() {
+    final map = <int, List<(EngineRole, int)>>{};
+    mapping.forEach((role, key) {
+      final parts = key.split(':');
+      if (parts.length != 2) return;
+      final g = int.tryParse(parts[0]);
+      final idx = int.tryParse(parts[1]);
+      if (g != null && idx != null) {
+        (map[g] ??= []).add((role, idx));
+      }
+    });
+    _groupRoleLookup = map;
   }
 
   void _log(String m) {
@@ -99,10 +140,12 @@ class DashboardController extends ChangeNotifier {
         '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}:${t.second.toString().padLeft(2, '0')}';
     logs.add('$ts  $m');
     if (logs.length > 300) logs.removeRange(0, logs.length - 300);
-    s.saveLogs(logs);
+    _scheduleLogSave();
   }
 
   void clearLogs() {
+    _logSaveTimer?.cancel();
+    _logSaveTimer = null;
     logs.clear();
     s.saveLogs(logs);
     notifyListeners();
@@ -331,9 +374,12 @@ class DashboardController extends ChangeNotifier {
   // ------------------------------------------------------------------ evenements natifs
 
   void _onEvent(Map<dynamic, dynamic> e) {
-    switch (e['type']) {
+    final type = e['type'];
+    switch (type) {
       case 'log':
         _log(e['msg'] as String);
+        _notifyLogsThrottled();
+        return;
       case 'state':
         connState = e['state'] as String;
         final msg = e['msg'] as String?;
@@ -463,13 +509,12 @@ class DashboardController extends ChangeNotifier {
       }
     }
 
-    mapping.forEach((role, key) {
-      final parts = key.split(':');
-      if (int.parse(parts[0]) == g) {
-        final idx = int.parse(parts[1]);
+    final entries = _groupRoleLookup[g];
+    if (entries != null) {
+      for (final (role, idx) in entries) {
         if (idx < vals.length && vals[idx].value != null) data.set(role, vals[idx].value!);
       }
-    });
+    }
 
     if (discovering && discoveryGroups.every(groupOk.containsKey)) {
       discovering = false;
@@ -572,6 +617,7 @@ class DashboardController extends ChangeNotifier {
     });
 
     mapping = found;
+    _rebuildGroupLookup();
     if (!silent) {
       found.forEach((r, k) => _log('${r.label} → groupe ${k.replaceAll(":", " champ ")}'));
     }
@@ -585,6 +631,7 @@ class DashboardController extends ChangeNotifier {
     } else {
       mapping[role] = key;
     }
+    _rebuildGroupLookup();
     if (exploreGroup == null && mode == SourceMode.car && !discovering) kline.setGroups(_schedule());
     notifyListeners();
   }
@@ -697,6 +744,16 @@ class DashboardController extends ChangeNotifier {
     _sw.reset();
     if (dt <= 0 || dt > 2) return;
 
+    // En veille / deconnecte : 0 recalcul et 1 seul rafraichissement par minute pour l'horloge.
+    if (mode == SourceMode.none) {
+      final min = DateTime.now().minute;
+      if (min != _lastClockMinute) {
+        _lastClockMinute = min;
+        notifyListeners();
+      }
+      return;
+    }
+
     if (mode == SourceMode.sim) sim.step(dt, data);
 
     // vitesse lue uniquement depuis le calculateur (0 drain GPS)
@@ -706,7 +763,7 @@ class DashboardController extends ChangeNotifier {
     lph = computeLph() ?? 0;
     final running = rpm != null && rpm! > 300;
 
-    if (mode != SourceMode.none && running) {
+    if (running) {
       final dKm = speed * dt / 3600;
       final dL = lph * dt / 3600;
       s.tripKm += dKm;
@@ -759,7 +816,21 @@ class DashboardController extends ChangeNotifier {
       l100Inst = null;
     }
 
-    notifyListeners();
+    final min = DateTime.now().minute;
+    final minuteChanged = min != _lastClockMinute;
+    if (minuteChanged) _lastClockMinute = min;
+
+    if (mode == SourceMode.sim || minuteChanged) {
+      notifyListeners();
+    } else {
+      // En mode voiture, les nouvelles trames KWP notifient deja immediatement via _onEvent :
+      // on limite les rafraichissements de lissage pur a ~4 Hz pour economiser CPU/batterie.
+      _carUiAcc += dt;
+      if (_carUiAcc >= 0.25) {
+        _carUiAcc = 0;
+        notifyListeners();
+      }
+    }
   }
 
   // ------------------------------------------------------------------ actions utilisateur

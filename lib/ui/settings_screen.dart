@@ -14,25 +14,54 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   Widget _num(String label, String help, double value, void Function(double) onSet, {int digits = 1}) {
-    return ListTile(
-      title: Text(label),
-      subtitle: Text(help, style: const TextStyle(color: Retro.grey, fontSize: 12)),
-      trailing: SizedBox(
-        width: 110,
-        child: TextFormField(
-          key: ValueKey('$label$value'),
-          initialValue: value.toStringAsFixed(digits),
-          textAlign: TextAlign.end,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          onFieldSubmitted: (t) {
-            final v = double.tryParse(t.replaceAll(',', '.'));
-            if (v != null) {
-              onSet(v);
-              widget.c.s.changed();
-              setState(() {});
-            }
-          },
-        ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(fontSize: 15, color: Retro.white)),
+                const SizedBox(height: 2),
+                Text(help, style: const TextStyle(color: Retro.grey, fontSize: 12)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          SizedBox(
+            width: 92,
+            child: TextFormField(
+              key: ValueKey('$label$value'),
+              initialValue: value.toStringAsFixed(digits),
+              textAlign: TextAlign.end,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                filled: true,
+                fillColor: Retro.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Retro.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Retro.border),
+                ),
+              ),
+              onFieldSubmitted: (t) {
+                final v = double.tryParse(t.replaceAll(',', '.'));
+                if (v != null) {
+                  onSet(v);
+                  widget.c.s.changed();
+                  setState(() {});
+                }
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -42,9 +71,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final s = widget.c.s;
     final prof = s.profile;
     return Scaffold(
-      appBar: AppBar(title: const Text('Réglages')),
-      body: ListView(
-        children: [
+      appBar: AppBar(title: const Text('Réglages', maxLines: 1, overflow: TextOverflow.ellipsis)),
+      body: SafeArea(
+        top: false,
+        child: ListView(
+          children: [
           _Section('Profil véhicule & Thème OEM', color: prof.accent),
           ListTile(
             leading: BrandEmblem(brand: prof.brand, accent: prof.accent, size: 30),
@@ -125,12 +156,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const Padding(
             padding: EdgeInsets.all(16),
             child: Text(
-              'OldBoard est en LECTURE SEULE (et sans GPS pour économiser la batterie) : '
-              'il ne peut ni effacer de codes, ni coder, ni reprogrammer le calculateur.',
+              'OldBoard lit les capteurs KWP1281 en direct (sans GPS pour économiser la batterie). '
+              'Les fonctions atelier (RAZ défauts, calibrage papillon, Canal 00) demandent toujours une confirmation.',
               style: TextStyle(color: Retro.grey, fontSize: 12),
             ),
           ),
         ],
+      ),
       ),
     );
   }

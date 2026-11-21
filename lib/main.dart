@@ -18,6 +18,13 @@ Future<void> main() async {
       DeviceOrientation.landscapeRight,
     ]);
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      statusBarBrightness: Brightness.dark,
+      systemNavigationBarColor: Retro.bg,
+      systemNavigationBarIconBrightness: Brightness.light,
+    ));
   }
   try {
     await WakelockPlus.enable(); // l'ecran reste allume pendant la conduite
@@ -44,6 +51,17 @@ class OldBoardApp extends StatelessWidget {
           title: 'OldBoard',
           debugShowCheckedModeBanner: false,
           theme: Retro.theme(prof.accent),
+          builder: (context, child) {
+            final media = MediaQuery.of(context);
+            final clamped = media.textScaler.clamp(
+              minScaleFactor: 0.85,
+              maxScaleFactor: 1.25,
+            );
+            return MediaQuery(
+              data: media.copyWith(textScaler: clamped),
+              child: child ?? const SizedBox.shrink(),
+            );
+          },
           home: c.s.profileSelected
               ? DashboardScreen(c: c)
               : ProfilePickerScreen(
