@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 4 anneaux entrelacés Audi centrés dans la safe-zone (x: 22..86, y: 50) -->
+    <!-- Anneau 1 (centre 33.5, 50, rayon 9.5) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#F2F2F2"
+        android:strokeWidth="2.8"
+        android:pathData="M 33.5,40.5 A 9.5,9.5 0 1,1 33.49,40.5 Z" />
+    <!-- Anneau 2 (centre 47.2, 50, rayon 9.5) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#F2F2F2"
+        android:strokeWidth="2.8"
+        android:pathData="M 47.2,40.5 A 9.5,9.5 0 1,1 47.19,40.5 Z" />
+    <!-- Anneau 3 (centre 60.8, 50, rayon 9.5) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#F2F2F2"
+        android:strokeWidth="2.8"
+        android:pathData="M 60.8,40.5 A 9.5,9.5 0 1,1 60.79,40.5 Z" />
+    <!-- Anneau 4 (centre 74.5, 50, rayon 9.5) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#F2F2F2"
+        android:strokeWidth="2.8"
+        android:pathData="M 74.5,40.5 A 9.5,9.5 0 1,1 74.49,40.5 Z" />
+</vector>
