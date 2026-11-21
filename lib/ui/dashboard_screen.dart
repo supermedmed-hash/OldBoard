@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../models/dashboard_layout.dart';
 import '../models/engine_data.dart';
 import '../services/dashboard_controller.dart';
 import '../services/update_service.dart';
+import 'dashboard_editor_screen.dart';
 import 'diag_screen.dart';
 import 'profile_picker_screen.dart';
 import 'settings_screen.dart';
@@ -73,7 +75,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       backgroundColor: Retro.bg,
       body: SafeArea(
         child: ListenableBuilder(
-          listenable: c,
+          listenable: Listenable.merge([c, c.s]),
           builder: (context, _) {
             return LayoutBuilder(
               builder: (context, box) {
@@ -259,21 +261,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
           flex: 35,
           child: Row(
             children: [
-              Expanded(child: _consoHeroCard()),
+              Expanded(child: _buildHeroSlot(context, 0)),
               SizedBox(width: gap),
-              Expanded(child: _rangeHeroCard()),
+              Expanded(child: _buildHeroSlot(context, 1)),
             ],
           ),
         ),
         SizedBox(height: gap),
         Expanded(
           flex: 22,
-          child: _tempsAndElecRow(gap),
+          child: _tileRow(context, 0, gap),
         ),
         SizedBox(height: gap),
         Expanded(
           flex: 22,
-          child: _engineTelemetryRow(gap),
+          child: _tileRow(context, 3, gap),
         ),
         SizedBox(height: gap),
         Expanded(
@@ -296,9 +298,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 flex: 60,
                 child: Row(
                   children: [
-                    Expanded(child: _consoHeroCard()),
+                    Expanded(child: _buildHeroSlot(context, 0)),
                     SizedBox(width: gap),
-                    Expanded(child: _rangeHeroCard()),
+                    Expanded(child: _buildHeroSlot(context, 1)),
                   ],
                 ),
               ),
@@ -312,13 +314,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
           flex: 48,
           child: Column(
             children: [
-              Expanded(child: _tempsAndElecRow(gap)),
+              Expanded(child: _tileRow(context, 0, gap)),
               SizedBox(height: gap),
-              Expanded(child: _engineTelemetryRow(gap)),
+              Expanded(child: _tileRow(context, 3, gap)),
             ],
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildHeroSlot(BuildContext context, int index) {
+    final slot = c.s.heroSlots[index];
+    final card = switch (slot) {
+      HeroSlotType.conso => _consoHeroCard(),
+      HeroSlotType.range => _rangeHeroCard(),
+      HeroSlotType.speed => _speedHeroCard(),
+      HeroSlotType.rpm => _rpmHeroCard(),
+    };
+    return GestureDetector(
+      onLongPress: () => showHeroSlotPicker(context, settings: c.s, slotIndex: index),
+      child: card,
+    );
+  }
+
+  Widget _tileRow(BuildContext context, int startIndex, double gap) {
+    return Row(
+      children: [
+        Expanded(child: _buildTileSlot(context, startIndex)),
+        SizedBox(width: gap),
+        Expanded(child: _buildTileSlot(context, startIndex + 1)),
+        SizedBox(width: gap),
+        Expanded(child: _buildTileSlot(context, startIndex + 2)),
+      ],
+    );
+  }
+
+  Widget _buildTileSlot(BuildContext context, int index) {
+    final slot = c.s.tileSlots[index];
+    return GestureDetector(
+      onLongPress: () => showTileSlotPicker(context, settings: c.s, slotIndex: index),
+      child: _tileForType(slot),
     );
   }
 
@@ -470,6 +506,140 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Widget _speedHeroCard() {
+    final spd = c.data.get(EngineRole.speed);
+    final val = spd == null ? '—' : spd.toStringAsFixed(0);
+    final status = spd == null ? RangeStatus.unknown : _check(spd, 0, 135);
+    final barFrac = spd == null ? 0.0 : (spd / 200.0).clamp(0.0, 1.0);
+
+    return _heroCard(
+      title: 'VITESSE',
+      spec: spd == null ? 'CAPTEUR OBD' : (spd > 130 ? 'AUTOROUTE' : 'RÉELLE ECU'),
+      status: status,
+      builder: (compactH) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(val, style: Retro.num(50, w: FontWeight.w800, c: Retro.valueColor(status))),
+                  const SizedBox(width: 8),
+                  Text('KM/H', style: Retro.title(14, c: Retro.silver)),
+                ],
+              ),
+            ),
+          ),
+          _segmentedBar(
+            fraction: barFrac,
+            segments: 20,
+            height: compactH ? 4.5 : 6,
+            activeColor: status == RangeStatus.high ? Retro.red : c.s.profile.accent,
+          ),
+          SizedBox(height: compactH ? 4 : 8),
+          Row(
+            children: [
+              Expanded(
+                child: _subMetric(
+                  'MOY. TRAJET',
+                  c.tripAvgSpeed > 0 ? '${c.tripAvgSpeed.toStringAsFixed(0)} km/h' : '—',
+                  RangeStatus.normal,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(width: 1, height: compactH ? 20 : 24, color: Retro.border),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _subMetric(
+                  'DISTANCE',
+                  '${c.s.tripKm.toStringAsFixed(1)} km',
+                  RangeStatus.normal,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _rpmHeroCard() {
+    final rpm = c.rpm;
+    final shift = c.s.shiftRpm.toDouble();
+    final maxScale = c.s.profile.isDiesel ? 5000.0 : 7000.0;
+    final status = rpm == null
+        ? RangeStatus.unknown
+        : (rpm < 550 ? RangeStatus.low : (rpm >= shift ? RangeStatus.high : RangeStatus.normal));
+    final barFrac = rpm == null ? 0.0 : (rpm / maxScale).clamp(0.0, 1.0);
+    final thr = c.data.get(EngineRole.throttle);
+    final load = c.data.get(EngineRole.load);
+
+    return _heroCard(
+      title: 'RÉGIME MOTEUR',
+      spec: rpm == null
+          ? 'ZONE ${shift.toStringAsFixed(0)} TR'
+          : (rpm >= shift ? 'ZONE ROUGE !' : 'MAX ${c.s.maxRpm > 0 ? c.s.maxRpm.toStringAsFixed(0) : shift.toStringAsFixed(0)}'),
+      status: status,
+      builder: (compactH) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    rpm == null ? '—' : rpm.toStringAsFixed(0),
+                    style: Retro.num(50, w: FontWeight.w800, c: Retro.valueColor(status)),
+                  ),
+                  const SizedBox(width: 8),
+                  Text('TR/MIN', style: Retro.title(13, c: Retro.silver)),
+                ],
+              ),
+            ),
+          ),
+          _segmentedBar(
+            fraction: barFrac,
+            segments: 20,
+            height: compactH ? 4.5 : 6,
+            activeColor: status == RangeStatus.high ? Retro.red : (status == RangeStatus.low ? Retro.blue : c.s.profile.accent),
+          ),
+          SizedBox(height: compactH ? 4 : 8),
+          Row(
+            children: [
+              Expanded(
+                child: _subMetric(
+                  'PAPILLON',
+                  thr != null ? '${thr.toStringAsFixed(1)}°' : '—',
+                  RangeStatus.normal,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(width: 1, height: compactH ? 20 : 24, color: Retro.border),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _subMetric(
+                  'CHARGE',
+                  load != null ? '${load.toStringAsFixed(0)} %' : '—',
+                  RangeStatus.normal,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _subMetric(String label, String value, RangeStatus status) {
     return FittedBox(
       fit: BoxFit.scaleDown,
@@ -486,233 +656,285 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // ------------------------------------------------------------------ TEMPÉRATURES MOTEUR & ÉLECTRICITÉ
-  Widget _tempsAndElecRow(double gap) {
-    final coolant = c.data.get(EngineRole.coolant);
-    final oil = c.data.get(EngineRole.oilTemp);
-    final iat = c.data.get(EngineRole.intakeAir);
-    final batt = c.data.get(EngineRole.battery);
+  // ------------------------------------------------------------------ TUILES CAPTEURS PERSONNALISABLES
+  Widget _tileForType(TileSlotType type) {
+    final prof = c.s.profile;
     final running = (c.rpm ?? 0) > 400;
 
-    // 1. Cote Temp. Moteur (Sonde culasse G62) : 80 °C .. 105 °C
-    final coolantStatus = _check(coolant, 80, 105);
-    final coolantSub = switch (coolantStatus) {
-      RangeStatus.low => 'FROID (< 80°C)',
-      RangeStatus.normal => 'OPTIMAL (80–105°C)',
-      RangeStatus.high => 'SURCHAUFFE (> 105°C)',
-      RangeStatus.unknown => 'COTE 80–105°C',
-    };
+    switch (type) {
+      case TileSlotType.coolant:
+        final coolant = c.data.get(EngineRole.coolant);
+        final st = _check(coolant, 80, 105);
+        return _metricTile(
+          label: 'TEMP. MOTEUR',
+          value: _f(coolant, 0),
+          unit: '°C',
+          sub: switch (st) {
+            RangeStatus.low => 'FROID (< 80°C)',
+            RangeStatus.normal => 'OPTIMAL (80–105°C)',
+            RangeStatus.high => 'SURCHAUFFE (> 105°C)',
+            RangeStatus.unknown => 'COTE 80–105°C',
+          },
+          status: st,
+        );
 
-    // 2. Cote Air Admission (G42) : 5 °C .. 60 °C (ou Huile : 80 °C .. 120 °C)
-    final hasOil = oil != null;
-    final secondStatus = hasOil ? _check(oil, 80, 120) : _check(iat, 5, 60);
-    final secondSub = hasOil
-        ? switch (secondStatus) {
+      case TileSlotType.intakeAir:
+        final oil = c.data.get(EngineRole.oilTemp);
+        final iat = c.data.get(EngineRole.intakeAir);
+        final hasOil = oil != null;
+        final st = hasOil ? _check(oil, 80, 120) : _check(iat, 5, 60);
+        return _metricTile(
+          label: hasOil ? 'TEMP. HUILE' : 'AIR ADMISSION',
+          value: hasOil ? _f(oil, 0) : _f(iat, 0),
+          unit: '°C',
+          sub: hasOil
+              ? switch (st) {
+                  RangeStatus.low => 'HUILE FROIDE (< 80°C)',
+                  RangeStatus.normal => 'OPTIMAL (80–120°C)',
+                  RangeStatus.high => 'TROP CHAUDE (> 120°C)',
+                  RangeStatus.unknown => 'COTE 80–120°C',
+                }
+              : switch (st) {
+                  RangeStatus.low => 'AIR FROID (< 5°C)',
+                  RangeStatus.normal => 'NORMAL (5–60°C)',
+                  RangeStatus.high => 'AIR CHAUD (> 60°C)',
+                  RangeStatus.unknown => 'COTE 5–60°C',
+                },
+          status: st,
+        );
+
+      case TileSlotType.oilTemp:
+        final oil = c.data.get(EngineRole.oilTemp);
+        final st = _check(oil, 80, 120);
+        return _metricTile(
+          label: 'TEMP. HUILE',
+          value: _f(oil, 0),
+          unit: '°C',
+          sub: switch (st) {
             RangeStatus.low => 'HUILE FROIDE (< 80°C)',
             RangeStatus.normal => 'OPTIMAL (80–120°C)',
             RangeStatus.high => 'TROP CHAUDE (> 120°C)',
             RangeStatus.unknown => 'COTE 80–120°C',
-          }
-        : switch (secondStatus) {
-            RangeStatus.low => 'AIR FROID (< 5°C)',
-            RangeStatus.normal => 'NORMAL (5–60°C)',
-            RangeStatus.high => 'AIR CHAUD (> 60°C)',
-            RangeStatus.unknown => 'COTE 5–60°C',
-          };
+          },
+          status: st,
+        );
 
-    // 3. Cote Tension Batterie : 13.2 V .. 14.6 V moteur tournant (12.0 .. 14.6 V moteur arrêté)
-    final minVolt = running ? 13.2 : 12.0;
-    final battStatus = _check(batt, minVolt, 14.6);
-    final battSub = switch (battStatus) {
-      RangeStatus.low => 'TROP BAS (< ${minVolt.toStringAsFixed(1)}V)',
-      RangeStatus.normal => 'NORMAL (${minVolt.toStringAsFixed(1)}–14.6V)',
-      RangeStatus.high => 'SURTENSION (> 14.6V)',
-      RangeStatus.unknown => 'COTE 13.2–14.6V',
-    };
+      case TileSlotType.battery:
+        final batt = c.data.get(EngineRole.battery);
+        final minVolt = running ? 13.2 : 12.0;
+        final st = _check(batt, minVolt, 14.6);
+        return _metricTile(
+          label: 'BATTERIE',
+          value: _f(batt, 2),
+          unit: 'V',
+          sub: switch (st) {
+            RangeStatus.low => 'TROP BAS (< ${minVolt.toStringAsFixed(1)}V)',
+            RangeStatus.normal => 'NORMAL (${minVolt.toStringAsFixed(1)}–14.6V)',
+            RangeStatus.high => 'SURTENSION (> 14.6V)',
+            RangeStatus.unknown => 'COTE 13.2–14.6V',
+          },
+          status: st,
+        );
 
-    return Row(
-      children: [
-        Expanded(
-          child: _metricTile(
-            label: 'TEMP. MOTEUR',
-            value: _f(coolant, 0),
-            unit: '°C',
-            sub: coolantSub,
-            status: coolantStatus,
-          ),
-        ),
-        SizedBox(width: gap),
-        Expanded(
-          child: _metricTile(
-            label: hasOil ? 'TEMP. HUILE' : 'AIR ADMISSION',
-            value: hasOil ? _f(oil, 0) : _f(iat, 0),
-            unit: '°C',
-            sub: secondSub,
-            status: secondStatus,
-          ),
-        ),
-        SizedBox(width: gap),
-        Expanded(
-          child: _metricTile(
-            label: 'BATTERIE',
-            value: _f(batt, 2),
-            unit: 'V',
-            sub: battSub,
-            status: battStatus,
-          ),
-        ),
-      ],
-    );
-  }
+      case TileSlotType.injection:
+        if (prof.isDiesel) {
+          final mg = c.data.get(EngineRole.fuelMg);
+          final st = c.isCutoff ? RangeStatus.low : _check(mg, 1.5, 55.0);
+          return _metricTile(
+            label: 'INJECTION TDI',
+            value: c.isCutoff ? '0.0' : _f(mg, 1),
+            unit: 'mg/c',
+            sub: c.isCutoff ? 'COUPURE FREIN MOTEUR' : 'RALENTI 2.5–9 mg/c',
+            status: st,
+          );
+        }
+        final inj = c.data.get(EngineRole.injection);
+        final eff = c.isCutoff ? 0.0 : inj;
+        final st = c.isCutoff ? RangeStatus.low : _check(inj, 1.8, 15.0);
+        return _metricTile(
+          label: 'INJECTION',
+          value: _f(eff, 2),
+          unit: 'ms',
+          sub: switch (st) {
+            RangeStatus.low => c.isCutoff ? 'COUPURE FREIN MOTEUR' : 'COUPURE (< 1.8 ms)',
+            RangeStatus.normal => 'NORMAL (1.8–15 ms)',
+            RangeStatus.high => 'MAX (> 15.0 ms)',
+            RangeStatus.unknown => 'COTE 1.8–15 ms',
+          },
+          status: st,
+        );
 
-  // ------------------------------------------------------------------ TÉLÉMÉTRIE MOTEUR (ESSENCE / TURBO / DIESEL TDI)
-  Widget _engineTelemetryRow(double gap) {
-    final prof = c.s.profile;
-    final inj = c.data.get(EngineRole.injection);
-    final map = c.data.get(EngineRole.map);
-    final maf = c.data.get(EngineRole.maf);
-    final thr = c.data.get(EngineRole.throttle);
-    final lam = c.data.get(EngineRole.lambda);
-    final mg = c.data.get(EngineRole.fuelMg);
+      case TileSlotType.lambda:
+        final lam = c.data.get(EngineRole.lambda);
+        if (prof.isDiesel && lam == null) {
+          return _tileForType(TileSlotType.boost);
+        }
+        final st = _check(lam, -10.0, 10.0);
+        return _metricTile(
+          label: 'LAMBDA (G39)',
+          value: lam == null ? '—' : '${lam >= 0 ? '+' : ''}${lam.toStringAsFixed(1)}',
+          unit: '%',
+          sub: switch (st) {
+            RangeStatus.low => 'TROP RICHE (< -10%)',
+            RangeStatus.normal => 'MÉLANGE OK (-10..+10%)',
+            RangeStatus.high => 'PRISE D\'AIR (> +10%)',
+            RangeStatus.unknown => 'COTE -10..+10%',
+          },
+          status: st,
+        );
 
-    // Mode Diesel 1.9 TDI (EDC15) : Injection mg/coup + Pression Turbo bar + MAF / Pédale %
-    if (prof.isDiesel) {
-      final mgStatus = c.isCutoff ? RangeStatus.low : _check(mg, 1.5, 55.0);
-      final boostBar = map != null ? (map - 1013.0) / 1000.0 : null;
-      final boostStatus = _check(boostBar, -0.1, 1.55);
-      final mafStatus = _check(maf, 180, 1150);
-      return Row(
-        children: [
-          Expanded(
-            child: _metricTile(
-              label: 'INJECTION TDI',
-              value: c.isCutoff ? '0.0' : _f(mg, 1),
-              unit: 'mg/c',
-              sub: c.isCutoff ? 'COUPURE FREIN MOTEUR' : 'RALENTI 2.5–9 mg/c',
-              status: mgStatus,
-            ),
-          ),
-          SizedBox(width: gap),
-          Expanded(
-            child: _metricTile(
-              label: 'TURBO (GRP 11)',
-              value: boostBar == null ? '—' : '${boostBar >= 0 ? '+' : ''}${boostBar.toStringAsFixed(2)}',
-              unit: 'bar',
-              sub: map != null ? '${map.toStringAsFixed(0)} mbar abs.' : 'COTE 0.0–1.55 bar',
-              status: boostStatus,
-            ),
-          ),
-          SizedBox(width: gap),
-          Expanded(
-            child: _metricTile(
-              label: maf != null ? 'DÉBIT AIR (MAF)' : 'PÉDALE',
-              value: maf != null ? _f(maf, 0) : _f(thr, 0),
-              unit: maf != null ? 'mg/h' : '%',
-              sub: thr != null ? 'PÉDALE ${thr.toStringAsFixed(0)} %' : 'SONDE G70',
-              status: maf != null ? mafStatus : _check(thr, 0, 100),
-            ),
-          ),
-        ],
-      );
+      case TileSlotType.autoAir:
+        final map = c.data.get(EngineRole.map);
+        final maf = c.data.get(EngineRole.maf);
+        final thr = c.data.get(EngineRole.throttle);
+        if (prof.isDiesel) {
+          final mafSt = _check(maf, 180, 1150);
+          return _metricTile(
+            label: maf != null ? 'DÉBIT AIR (MAF)' : 'PÉDALE',
+            value: maf != null ? _f(maf, 0) : _f(thr, 0),
+            unit: maf != null ? 'mg/h' : '%',
+            sub: thr != null ? 'PÉDALE ${thr.toStringAsFixed(0)} %' : 'SONDE G70',
+            status: maf != null ? mafSt : _check(thr, 0, 100),
+          );
+        }
+        if (prof.hasTurbo && map != null) return _tileForType(TileSlotType.boost);
+        if (map != null) return _tileForType(TileSlotType.boost);
+        if (maf != null) return _tileForType(TileSlotType.maf);
+        return _tileForType(TileSlotType.throttle);
+
+      case TileSlotType.rpm:
+        final rpm = c.rpm;
+        final shift = c.s.shiftRpm.toDouble();
+        final st = rpm == null
+            ? RangeStatus.unknown
+            : (rpm < 550 ? RangeStatus.low : (rpm >= shift ? RangeStatus.high : RangeStatus.normal));
+        return _metricTile(
+          label: 'RÉGIME (RPM)',
+          value: rpm == null ? '—' : rpm.toStringAsFixed(0),
+          unit: 'tr/m',
+          sub: switch (st) {
+            RangeStatus.low => 'BAS (< 550 tr/m)',
+            RangeStatus.normal => 'ZONE OK (< ${shift.toStringAsFixed(0)})',
+            RangeStatus.high => 'ZONE ROUGE !',
+            RangeStatus.unknown => 'CAPTEUR G28',
+          },
+          status: st,
+        );
+
+      case TileSlotType.speed:
+        final spd = c.data.get(EngineRole.speed);
+        final st = spd == null ? RangeStatus.unknown : _check(spd, 0, 135);
+        return _metricTile(
+          label: 'VITESSE',
+          value: _f(spd, 0),
+          unit: 'km/h',
+          sub: c.tripAvgSpeed > 0 ? 'MOY. ${c.tripAvgSpeed.toStringAsFixed(0)} km/h' : 'VITESSE ECU',
+          status: st,
+        );
+
+      case TileSlotType.maf:
+        final maf = c.data.get(EngineRole.maf);
+        final thr = c.data.get(EngineRole.throttle);
+        if (prof.isDiesel) {
+          final st = _check(maf, 180, 1150);
+          return _metricTile(
+            label: 'DÉBIT AIR (MAF)',
+            value: _f(maf, 0),
+            unit: 'mg/h',
+            sub: 'COTE 180–1150 mg/h',
+            status: st,
+          );
+        }
+        final maxMaf = prof.hasTurbo ? 160.0 : 85.0;
+        final st = _check(maf, 2.0, maxMaf);
+        return _metricTile(
+          label: 'DÉBIT AIR',
+          value: _f(maf, 1),
+          unit: 'g/s',
+          sub: thr != null ? 'PAP ${thr.toStringAsFixed(1)}° • G70' : 'COTE 2–${maxMaf.toStringAsFixed(0)} g/s',
+          status: st,
+        );
+
+      case TileSlotType.throttle:
+        final thr = c.data.get(EngineRole.throttle);
+        final st = _check(thr, 2.0, 80.0);
+        return _metricTile(
+          label: prof.isDiesel ? 'PÉDALE' : 'PAPILLON',
+          value: _f(thr, 1),
+          unit: prof.isDiesel ? '%' : '°',
+          sub: switch (st) {
+            RangeStatus.low => 'FERMÉ (< 2)',
+            RangeStatus.normal => 'NORMAL (2–80)',
+            RangeStatus.high => 'PLEIN GAZ (> 80)',
+            RangeStatus.unknown => 'COTE 2–80',
+          },
+          status: st,
+        );
+
+      case TileSlotType.load:
+        final load = c.data.get(EngineRole.load);
+        final st = _check(load, 10, 88);
+        return _metricTile(
+          label: 'CHARGE MOTEUR',
+          value: _f(load, 0),
+          unit: '%',
+          sub: switch (st) {
+            RangeStatus.low => 'FAIBLE (< 10%)',
+            RangeStatus.normal => 'NORMAL (10–88%)',
+            RangeStatus.high => 'PLEINE CHARGE',
+            RangeStatus.unknown => 'COTE 10–88%',
+          },
+          status: st,
+        );
+
+      case TileSlotType.boost:
+        final map = c.data.get(EngineRole.map);
+        if (prof.hasTurbo || prof.isDiesel) {
+          final boostBar = map != null ? (map - 1013.0) / 1000.0 : null;
+          final maxBar = prof.isDiesel ? 1.55 : 1.35;
+          final st = _check(boostBar, prof.isDiesel ? -0.1 : -0.75, maxBar);
+          return _metricTile(
+            label: prof.isDiesel ? 'TURBO (GRP 11)' : 'TURBO (GRP 115)',
+            value: boostBar == null ? '—' : '${boostBar >= 0 ? '+' : ''}${boostBar.toStringAsFixed(2)}',
+            unit: 'bar',
+            sub: map != null ? '${map.toStringAsFixed(0)} mbar abs.' : 'COTE 0.0–$maxBar bar',
+            status: st,
+          );
+        }
+        final st = _check(map, 250, 950);
+        return _metricTile(
+          label: 'COLLECTEUR',
+          value: _f(map, 0),
+          unit: 'mbar',
+          sub: switch (st) {
+            RangeStatus.low => 'DÉPRESSION (< 250)',
+            RangeStatus.normal => 'NORMAL (250–950)',
+            RangeStatus.high => 'PLEINE CHARGE (> 950)',
+            RangeStatus.unknown => 'COTE 250–950',
+          },
+          status: st,
+        );
+
+      case TileSlotType.lph:
+        final st = (c.rpm ?? 0) > 300 ? _check(c.lph, prof.idleLphMin, 18.0) : RangeStatus.unknown;
+        return _metricTile(
+          label: 'DÉBIT DIRECT',
+          value: c.lph.toStringAsFixed(1),
+          unit: 'L/h',
+          sub: 'RALENTI ${prof.idleLphMin.toStringAsFixed(1)}–${prof.idleLphMax.toStringAsFixed(1)} L/h',
+          status: st,
+        );
+
+      case TileSlotType.avgSpeed:
+        final avg = c.tripAvgSpeed;
+        return _metricTile(
+          label: 'VITESSE MOY.',
+          value: avg > 0 ? avg.toStringAsFixed(0) : '—',
+          unit: 'km/h',
+          sub: 'TRAJET ${c.s.tripKm.toStringAsFixed(1)} km',
+          status: avg > 0 ? RangeStatus.normal : RangeStatus.unknown,
+        );
     }
-
-    // 1. Cote Temps d'injection Essence : 1.8 ms .. 15.0 ms (< 1.8 ms ou isCutoff = coupure -> Bleu, > 15 ms -> Rouge)
-    final effectiveInj = c.isCutoff ? 0.0 : inj;
-    final injStatus = c.isCutoff ? RangeStatus.low : _check(inj, 1.8, 15.0);
-    final injSub = switch (injStatus) {
-      RangeStatus.low => c.isCutoff ? 'COUPURE FREIN MOTEUR' : 'COUPURE (< 1.8 ms)',
-      RangeStatus.normal => 'NORMAL (1.8–15 ms)',
-      RangeStatus.high => 'MAX (> 15.0 ms)',
-      RangeStatus.unknown => 'COTE 1.8–15 ms',
-    };
-
-    // 2. Cote Lambda G39 : -10 % .. +10 % (< -10 % = Trop riche -> Bleu ; > +10 % = Prise d'air / Pauvre -> Rouge)
-    final lamStatus = _check(lam, -10.0, 10.0);
-    final lamVal = lam == null ? '—' : '${lam >= 0 ? '+' : ''}${lam.toStringAsFixed(1)}';
-    final lamSub = switch (lamStatus) {
-      RangeStatus.low => 'TROP RICHE (< -10%)',
-      RangeStatus.normal => 'MÉLANGE OK (-10..+10%)',
-      RangeStatus.high => 'PRISE D\'AIR (> +10%)',
-      RangeStatus.unknown => 'COTE -10..+10%',
-    };
-
-    // 3. Cote Turbo (1.8T ME7.5 Grp 115) ou Collecteur MAP (mbar) ou Débit air MAF (g/s) ou Papillon (°)
-    final RangeStatus thirdStatus;
-    final String thirdLabel;
-    final String thirdVal;
-    final String thirdUnit;
-    final String thirdSub;
-
-    if (prof.hasTurbo && map != null) {
-      final boostBar = (map - 1013.0) / 1000.0;
-      thirdLabel = 'TURBO (GRP 115)';
-      thirdVal = '${boostBar >= 0 ? '+' : ''}${boostBar.toStringAsFixed(2)}';
-      thirdUnit = 'bar';
-      thirdStatus = _check(boostBar, -0.75, 1.35);
-      thirdSub = '${map.toStringAsFixed(0)} mbar abs.';
-    } else if (map != null) {
-      thirdLabel = 'COLLECTEUR';
-      thirdVal = _f(map, 0);
-      thirdUnit = 'mbar';
-      thirdStatus = _check(map, 250, 950);
-      thirdSub = switch (thirdStatus) {
-        RangeStatus.low => 'DÉPRESSION (< 250)',
-        RangeStatus.normal => 'NORMAL (250–950)',
-        RangeStatus.high => 'PLEINE CHARGE (> 950)',
-        RangeStatus.unknown => 'COTE 250–950',
-      };
-    } else if (maf != null) {
-      thirdLabel = 'DÉBIT AIR';
-      thirdVal = _f(maf, 1);
-      thirdUnit = 'g/s';
-      thirdStatus = _check(maf, 2.0, prof.hasTurbo ? 160.0 : 85.0);
-      thirdSub = thr != null ? 'PAP ${thr.toStringAsFixed(1)}° • G70' : 'COTE 2–85 g/s';
-    } else {
-      thirdLabel = 'PAPILLON';
-      thirdVal = _f(thr, 1);
-      thirdUnit = '°';
-      thirdStatus = _check(thr, 2.0, 80.0);
-      thirdSub = switch (thirdStatus) {
-        RangeStatus.low => 'FERMÉ (< 2°)',
-        RangeStatus.normal => 'NORMAL (2–80°)',
-        RangeStatus.high => 'PLEIN GAZ (> 80°)',
-        RangeStatus.unknown => 'COTE 2–80°',
-      };
-    }
-
-    return Row(
-      children: [
-        Expanded(
-          child: _metricTile(
-            label: 'INJECTION',
-            value: _f(effectiveInj, 2),
-            unit: 'ms',
-            sub: injSub,
-            status: injStatus,
-          ),
-        ),
-        SizedBox(width: gap),
-        Expanded(
-          child: _metricTile(
-            label: 'LAMBDA (G39)',
-            value: lamVal,
-            unit: '%',
-            sub: lamSub,
-            status: lamStatus,
-          ),
-        ),
-        SizedBox(width: gap),
-        Expanded(
-          child: _metricTile(
-            label: thirdLabel,
-            value: thirdVal,
-            unit: thirdUnit,
-            sub: thirdSub,
-            status: thirdStatus,
-          ),
-        ),
-      ],
-    );
   }
 
   // ------------------------------------------------------------------ ORDINATEUR DE TRAJET

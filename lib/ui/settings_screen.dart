@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/dashboard_controller.dart';
 import '../services/update_service.dart';
+import 'dashboard_editor_screen.dart';
 import 'profile_picker_screen.dart';
 import 'theme.dart';
 import 'update_dialog.dart';
@@ -96,6 +97,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     },
                   ),
                 ),
+              );
+              if (mounted) setState(() {});
+            },
+          ),
+          ListTile(
+            leading: Icon(Icons.dashboard_customize_rounded, color: prof.accent, size: 28),
+            title: Text('Personnaliser le tableau de bord', style: Retro.title(13.5)),
+            subtitle: const Text(
+              'Vitesse, RPM, Turbo, Charge, Températures… choisir chaque case ou préréglage',
+              style: TextStyle(color: Retro.grey, fontSize: 12),
+            ),
+            trailing: const Icon(Icons.chevron_right, color: Retro.silver),
+            onTap: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => DashboardEditorScreen(settings: s)),
               );
               if (mounted) setState(() {});
             },

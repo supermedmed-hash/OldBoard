@@ -36,7 +36,7 @@ class AppReleaseInfo {
 class UpdateService extends ChangeNotifier {
   static const repoOwner = 'supermedmed-hash';
   static const repoName = 'OldBoard';
-  static const fallbackVersion = '1.1.1';
+  static const fallbackVersion = '1.2.0';
   static const _channel = MethodChannel('oldboard/updater');
   static const _progressChannel = EventChannel('oldboard/updater/progress');
 

@@ -89,6 +89,7 @@ class Simulator {
     d.set(EngineRole.maf, throttle == 0 && rpm > 1300 ? 2.0 : (3.0 + throttle * 75.0));
     d.set(EngineRole.fuelMg, throttle == 0 && rpm > 1300 ? 0.0 : (4.2 + throttle * 38.0));
     d.set(EngineRole.throttle, throttle * 84);
+    d.set(EngineRole.load, (18.0 + throttle * 78.0).clamp(0.0, 100.0));
     // Régulation lambda Simos 2 (oscillation normale entre -3 % et +3 % autour de 0 %)
     final lambdaOsc = math.sin(_phaseT * 2.4) * 2.8 + (_rnd.nextDouble() - 0.5) * 0.8;
     d.set(EngineRole.lambda, throttle == 0 && rpm > 1300 ? 0.0 : lambdaOsc);

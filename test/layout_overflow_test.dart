@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldboard/main.dart';
+import 'package:oldboard/models/dashboard_layout.dart';
 import 'package:oldboard/models/engine_data.dart';
 import 'package:oldboard/models/vehicle_profile.dart';
 import 'package:oldboard/services/dashboard_controller.dart';
 import 'package:oldboard/services/settings.dart';
 import 'package:oldboard/services/update_service.dart';
 import 'package:oldboard/services/vag_decoder.dart';
+import 'package:oldboard/ui/dashboard_editor_screen.dart';
 import 'package:oldboard/ui/dashboard_screen.dart';
 import 'package:oldboard/ui/diag_screen.dart';
 import 'package:oldboard/ui/profile_picker_screen.dart';
@@ -341,5 +343,30 @@ void main() {
     FlutterError.onError = prev;
 
     expect(errors, isEmpty, reason: 'OldBoardApp a échoué à fontScale=2.0: $errors');
+  });
+
+  testWidgets('Tableau de bord personnalisé (Vitesse + RPM + toutes les cases) & éditeur : zéro overflow',
+      (tester) async {
+    final c = await _makeController(populated: true, connState: 'connected', statusOverride: 'CONNECTÉ');
+    c.data.set(EngineRole.speed, 118);
+    c.data.set(EngineRole.load, 64);
+    c.s.applyDashboardPreset(DashboardPreset.all[1]); // Sport — Vitesse & RPM
+
+    for (final entry in _androidSizes.entries) {
+      await _pumpWithGuard(
+        tester,
+        DashboardScreen(c: c),
+        entry.value,
+        textScale: 1.25,
+        label: 'Dashboard(SportSpeedRpm)@${entry.key}',
+      );
+      await _pumpWithGuard(
+        tester,
+        DashboardEditorScreen(settings: c.s),
+        entry.value,
+        textScale: 1.25,
+        label: 'DashboardEditor@${entry.key}',
+      );
+    }
   });
 }

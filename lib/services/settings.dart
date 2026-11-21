@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/dashboard_layout.dart';
 import '../models/vehicle_profile.dart';
 
 /// Reglages + memoires persistantes (profil vehicule, trajet, carburant restant, journal diagnostic...).
@@ -48,6 +49,10 @@ class AppSettings extends ChangeNotifier {
 
   /// Affectations manuelles : role -> "groupe:index"
   Map<String, String> roleOverrides = {};
+
+  /// Emplacements personnalisés du tableau de bord (2 grandes cartes + 6 tuiles).
+  List<HeroSlotType> heroSlots = List<HeroSlotType>.from(DashboardPreset.defaultHeroes);
+  List<TileSlotType> tileSlots = List<TileSlotType>.from(DashboardPreset.defaultTiles);
 
   /// Dernier journal de diagnostic enregistre automatiquement
   List<String> savedLogs = [];
@@ -100,6 +105,19 @@ class AppSettings extends ChangeNotifier {
     if (ro != null) {
       roleOverrides = Map<String, String>.from(jsonDecode(ro) as Map);
     }
+    final savedHeroes = p.getStringList('heroSlots');
+    if (savedHeroes != null && savedHeroes.length == 2) {
+      heroSlots = [
+        heroSlotFromName(savedHeroes[0], DashboardPreset.defaultHeroes[0]),
+        heroSlotFromName(savedHeroes[1], DashboardPreset.defaultHeroes[1]),
+      ];
+    }
+    final savedTiles = p.getStringList('tileSlots');
+    if (savedTiles != null && savedTiles.length == 6) {
+      tileSlots = [
+        for (var i = 0; i < 6; i++) tileSlotFromName(savedTiles[i], DashboardPreset.defaultTiles[i]),
+      ];
+    }
     notifyListeners();
   }
 
@@ -120,7 +138,27 @@ class AppSettings extends ChangeNotifier {
     await p.setString('ignoredUpdateTag', ignoredUpdateTag);
     await saveMemories();
     await p.setString('roleOverrides', jsonEncode(roleOverrides));
+    await p.setStringList('heroSlots', heroSlots.map((e) => e.name).toList());
+    await p.setStringList('tileSlots', tileSlots.map((e) => e.name).toList());
     notifyListeners();
+  }
+
+  void setHeroSlot(int index, HeroSlotType type) {
+    if (index < 0 || index >= heroSlots.length) return;
+    heroSlots[index] = type;
+    changed();
+  }
+
+  void setTileSlot(int index, TileSlotType type) {
+    if (index < 0 || index >= tileSlots.length) return;
+    tileSlots[index] = type;
+    changed();
+  }
+
+  void applyDashboardPreset(DashboardPreset preset) {
+    heroSlots = List<HeroSlotType>.from(preset.heroes);
+    tileSlots = List<TileSlotType>.from(preset.tiles);
+    changed();
   }
 
   Future<void> saveMemories() async {

@@ -61,6 +61,7 @@ Transforme n'importe quel smartphone ou autoradio Android en véritable **affich
   * Calibrage du boîtier papillon (`0x28` — **Groupe `098`** à câble, **Groupe `060`** électronique DBW).
   * Remise à zéro des auto-adaptations (**Canal `00`**, `0x2A`).
   * Explorateur de blocs bruts (`0xE7` & `F4 raw`) et export du rapport diagnostic complet en 1 clic.
+* **Tableau de bord 100 % personnalisable** : appui long sur n'importe quelle carte ou case (ou via *Réglages → Personnaliser le tableau de bord*) pour choisir parmi **4 grandes cartes** (`Consommation`, `Autonomie`, `Vitesse OBD`, `Régime moteur RPM`) et **15 capteurs** (`Vitesse`, `RPM`, `Temp. eau G62`, `Air G42`, `Huile`, `Batterie`, `Injection`, `Lambda G39`, `MAF G70`, `Papillon`, `Charge moteur %`, `Turbo / Collecteur`, `Débit L/h`, `Vitesse moyenne`…), avec **3 préréglages en 1 clic** *(OEM Conso, Sport Vitesse & RPM, Mixte)*.
 * **Mode Simulation & Mises à jour auto** : test complet sans câble + notifications de mise à jour directement via GitHub Releases.
 
 ---
