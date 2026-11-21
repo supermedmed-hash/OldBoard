@@ -305,6 +305,8 @@ void main() {
       await tester.pumpAndSettle();
       FlutterError.onError = prev;
       expect(errors, isEmpty, reason: 'UpdateDialog overflow sur $size: $errors');
+      await tester.tap(find.text('Plus tard'));
+      await tester.pumpAndSettle();
     }
     addTearDown(() {
       tester.view.resetPhysicalSize();

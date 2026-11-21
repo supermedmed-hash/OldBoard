@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../models/vehicle_profile.dart';
 import '../services/settings.dart';
+import 'brand_emblems.dart';
 import 'theme.dart';
+
+export 'brand_emblems.dart' show BrandEmblem;
 
 /// Écran de sélection de profil véhicule (affiché au 1er lancement et accessible depuis Réglages).
 class ProfilePickerScreen extends StatefulWidget {
@@ -157,7 +160,12 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
         ),
         child: Row(
           children: [
-            BrandEmblem(brand: p.brand, accent: p.accent, size: 34),
+            SizedBox(
+              width: 48,
+              child: Center(
+                child: BrandEmblem(brand: p.brand, accent: p.accent, size: 32),
+              ),
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -197,79 +205,4 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
       ),
     );
   }
-}
-
-/// Emblème vectoriel minimaliste pour chaque marque VAG (4 anneaux Audi, VW, SEAT, Škoda).
-class BrandEmblem extends StatelessWidget {
-  const BrandEmblem({
-    super.key,
-    required this.brand,
-    required this.accent,
-    this.size = 24,
-  });
-
-  final VehicleBrand brand;
-  final Color accent;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    if (brand == VehicleBrand.audi) {
-      return SizedBox(
-        width: size * 1.45,
-        height: size * 0.55,
-        child: CustomPaint(painter: _AudiRingsBrandPainter(color: Retro.white)),
-      );
-    }
-    final label = switch (brand) {
-      VehicleBrand.vw => 'VW',
-      VehicleBrand.seat => 'S',
-      VehicleBrand.skoda => 'ŠK',
-      VehicleBrand.audi => 'AUDI',
-    };
-    return Container(
-      width: size,
-      height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        shape: brand == VehicleBrand.vw ? BoxShape.circle : BoxShape.rectangle,
-        borderRadius: brand == VehicleBrand.vw ? null : BorderRadius.circular(size * 0.22),
-        color: accent.withValues(alpha: 0.16),
-        border: Border.all(color: accent, width: 1.6),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: Retro.white,
-          fontSize: size * 0.38,
-          fontWeight: FontWeight.w900,
-          letterSpacing: -0.5,
-        ),
-      ),
-    );
-  }
-}
-
-class _AudiRingsBrandPainter extends CustomPainter {
-  const _AudiRingsBrandPainter({required this.color});
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final r = size.height * 0.43;
-    final cy = size.height / 2;
-    final step = r * 1.42;
-    final totalW = step * 3 + r * 2;
-    final startX = (size.width - totalW) / 2 + r;
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = size.height * 0.13
-      ..color = color;
-    for (var i = 0; i < 4; i++) {
-      canvas.drawCircle(Offset(startX + i * step, cy), r, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _AudiRingsBrandPainter old) => old.color != color;
 }
