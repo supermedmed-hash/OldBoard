@@ -2,14 +2,61 @@ import 'package:flutter/material.dart';
 
 import '../models/engine_data.dart';
 import '../services/dashboard_controller.dart';
+import '../services/update_service.dart';
 import 'diag_screen.dart';
 import 'profile_picker_screen.dart';
 import 'settings_screen.dart';
 import 'theme.dart';
+import 'update_dialog.dart';
 
-class DashboardScreen extends StatelessWidget {
-  const DashboardScreen({super.key, required this.c});
+class DashboardScreen extends StatefulWidget {
+  const DashboardScreen({super.key, required this.c, this.updater});
   final DashboardController c;
+  final UpdateService? updater;
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  final Set<String> _promptedTags = {};
+
+  DashboardController get c => widget.c;
+  UpdateService? get updater => widget.updater;
+
+  @override
+  void initState() {
+    super.initState();
+    updater?.addListener(_onUpdateEvent);
+    _onUpdateEvent();
+  }
+
+  @override
+  void didUpdateWidget(covariant DashboardScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.updater != widget.updater) {
+      oldWidget.updater?.removeListener(_onUpdateEvent);
+      widget.updater?.addListener(_onUpdateEvent);
+    }
+  }
+
+  @override
+  void dispose() {
+    updater?.removeListener(_onUpdateEvent);
+    super.dispose();
+  }
+
+  void _onUpdateEvent() {
+    final u = updater;
+    final rel = u?.availableUpdate;
+    if (u == null || rel == null) return;
+    if (rel.tag == c.s.ignoredUpdateTag || _promptedTags.contains(rel.tag)) return;
+    _promptedTags.add(rel.tag);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      showUpdateDialog(context, updater: u, settings: c.s, release: rel);
+    });
+  }
 
   String _f(double? v, int d, [String dash = '—']) => v == null ? dash : v.toStringAsFixed(d);
 
@@ -1103,17 +1150,46 @@ class DashboardScreen extends StatelessWidget {
             SizedBox(
               width: compactW ? 36 : 40,
               height: btnH,
-              child: OutlinedButton(
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SettingsScreen(c: c))),
-                style: OutlinedButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  backgroundColor: Retro.surface,
-                  side: const BorderSide(color: Retro.border),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                child: const Icon(Icons.tune_rounded, size: 18, color: Retro.white),
+              child: ListenableBuilder(
+                listenable: updater ?? c,
+                builder: (context, _) {
+                  final hasUpdate = updater?.availableUpdate != null;
+                  return Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned.fill(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => SettingsScreen(c: c, updater: updater)),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            backgroundColor: Retro.surface,
+                            side: BorderSide(color: hasUpdate ? c.s.profile.accent : Retro.border),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          child: const Icon(Icons.tune_rounded, size: 18, color: Retro.white),
+                        ),
+                      ),
+                      if (hasUpdate)
+                        Positioned(
+                          right: 3,
+                          top: 3,
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: c.s.profile.accent,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Retro.bg, width: 1.2),
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
               ),
             ),
           ],

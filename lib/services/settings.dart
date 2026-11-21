@@ -27,6 +27,8 @@ class AppSettings extends ChangeNotifier {
   bool readClusterFuel = true;
   bool autoConnect = true;
   bool autoDetectVehicle = true;
+  bool autoCheckUpdates = true;
+  String ignoredUpdateTag = '';
 
   // --- memoires
   double fuelRemaining = 40; // L
@@ -76,6 +78,8 @@ class AppSettings extends ChangeNotifier {
     readClusterFuel = p.getBool('readClusterFuel') ?? readClusterFuel;
     autoConnect = p.getBool('autoConnect') ?? autoConnect;
     autoDetectVehicle = p.getBool('autoDetectVehicle') ?? autoDetectVehicle;
+    autoCheckUpdates = p.getBool('autoCheckUpdates') ?? autoCheckUpdates;
+    ignoredUpdateTag = p.getString('ignoredUpdateTag') ?? ignoredUpdateTag;
     fuelRemaining = p.getDouble('fuelRemaining') ?? fuelRemaining;
     longTermL100 = p.getDouble('longTermL100') ?? longTermL100;
     tripKm = p.getDouble('tripKm') ?? 0;
@@ -112,6 +116,8 @@ class AppSettings extends ChangeNotifier {
     await p.setBool('readClusterFuel', readClusterFuel);
     await p.setBool('autoConnect', autoConnect);
     await p.setBool('autoDetectVehicle', autoDetectVehicle);
+    await p.setBool('autoCheckUpdates', autoCheckUpdates);
+    await p.setString('ignoredUpdateTag', ignoredUpdateTag);
     await saveMemories();
     await p.setString('roleOverrides', jsonEncode(roleOverrides));
     notifyListeners();

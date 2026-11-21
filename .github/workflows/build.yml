@@ -32,6 +32,9 @@ jobs:
       - name: Static analysis
         run: flutter analyze
 
+      - name: Run widget & layout tests
+        run: flutter test
+
       - name: Build Android Release APK
         run: flutter build apk --release
 

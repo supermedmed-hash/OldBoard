@@ -5,12 +5,14 @@ import 'package:oldboard/models/engine_data.dart';
 import 'package:oldboard/models/vehicle_profile.dart';
 import 'package:oldboard/services/dashboard_controller.dart';
 import 'package:oldboard/services/settings.dart';
+import 'package:oldboard/services/update_service.dart';
 import 'package:oldboard/services/vag_decoder.dart';
 import 'package:oldboard/ui/dashboard_screen.dart';
 import 'package:oldboard/ui/diag_screen.dart';
 import 'package:oldboard/ui/profile_picker_screen.dart';
 import 'package:oldboard/ui/settings_screen.dart';
 import 'package:oldboard/ui/theme.dart';
+import 'package:oldboard/ui/update_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Matrice complète de tailles Android (petit portrait, compact, POCO 400x869,
@@ -229,6 +231,17 @@ void main() {
 
   testWidgets('DiagScreen & SettingsScreen : zéro overflow sur toutes les tailles Android', (tester) async {
     final c = await _makeController(populated: true, connState: 'connected', statusOverride: 'CONNECTÉ');
+    final updater = UpdateService()
+      ..currentVersion = '1.0.1'
+      ..availableUpdate = const AppReleaseInfo(
+        tag: 'v1.1.0',
+        version: '1.1.0',
+        title: 'OldBoard v1.1.0',
+        notes: '- Mises à jour automatiques via GitHub\n- Nouvelles captures README',
+        htmlUrl: 'https://github.com/supermedmed-hash/OldBoard/releases/tag/v1.1.0',
+        apkUrl: 'https://github.com/supermedmed-hash/OldBoard/releases/download/v1.1.0/OldBoard-release.apk',
+        apkSizeBytes: 48444211,
+      );
     for (final entry in _androidSizes.entries) {
       await _pumpWithGuard(
         tester,
@@ -239,12 +252,64 @@ void main() {
       );
       await _pumpWithGuard(
         tester,
-        SettingsScreen(c: c),
+        SettingsScreen(c: c, updater: updater),
         entry.value,
         textScale: 1.25,
         label: 'SettingsScreen@${entry.key}',
       );
     }
+  });
+
+  test('UpdateService.isNewerVersion compare correctement les tags semver', () {
+    expect(UpdateService.isNewerVersion('v1.1.0', '1.0.1'), isTrue);
+    expect(UpdateService.isNewerVersion('v1.0.2', '1.0.1'), isTrue);
+    expect(UpdateService.isNewerVersion('v2.0.0', '1.9.9'), isTrue);
+    expect(UpdateService.isNewerVersion('v1.1.0', '1.1.0'), isFalse);
+    expect(UpdateService.isNewerVersion('v1.0.0', '1.1.0'), isFalse);
+    expect(UpdateService.isNewerVersion('1.1.0+3', '1.1.0'), isFalse);
+  });
+
+  testWidgets('showUpdateDialog : zéro overflow en portrait compact et paysage bas', (tester) async {
+    final c = await _makeController();
+    final updater = UpdateService()..currentVersion = '1.0.1';
+    const release = AppReleaseInfo(
+      tag: 'v1.1.0',
+      version: '1.1.0',
+      title: 'OldBoard v1.1.0',
+      notes: '## Nouveautés\n- Mises à jour auto\n- Compatibilité tous Android\n- Optimisations batterie',
+      htmlUrl: 'https://github.com/supermedmed-hash/OldBoard/releases/tag/v1.1.0',
+      apkUrl: 'https://example.com/app.apk',
+      apkSizeBytes: 48000000,
+    );
+
+    for (final size in const [Size(320, 568), Size(640, 320)]) {
+      final errors = <FlutterErrorDetails>[];
+      final prev = FlutterError.onError;
+      FlutterError.onError = errors.add;
+      tester.view.devicePixelRatio = 1.0;
+      tester.view.physicalSize = size;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: Retro.theme(),
+          home: Builder(
+            builder: (ctx) => Scaffold(
+              body: ElevatedButton(
+                onPressed: () => showUpdateDialog(ctx, updater: updater, settings: c.s, release: release),
+                child: const Text('OPEN'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('OPEN'));
+      await tester.pumpAndSettle();
+      FlutterError.onError = prev;
+      expect(errors, isEmpty, reason: 'UpdateDialog overflow sur $size: $errors');
+    }
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
   });
 
   testWidgets('OldBoardApp clamp protège même à police système extrême (2.0x) sur 320x568', (tester) async {

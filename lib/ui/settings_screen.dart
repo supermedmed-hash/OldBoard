@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../services/dashboard_controller.dart';
+import '../services/update_service.dart';
 import 'profile_picker_screen.dart';
 import 'theme.dart';
+import 'update_dialog.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key, required this.c});
+  const SettingsScreen({super.key, required this.c, this.updater});
   final DashboardController c;
+  final UpdateService? updater;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -135,6 +138,83 @@ class _SettingsScreenState extends State<SettingsScreen> {
               s.changed();
             }),
           ),
+          const _Section('Mises à jour automatiques'),
+          SwitchListTile(
+            title: const Text('Vérifier les mises à jour au lancement'),
+            subtitle: const Text('Vérifie silencieusement GitHub Releases lorsqu\'une connexion Internet est disponible'),
+            value: s.autoCheckUpdates,
+            onChanged: (v) => setState(() {
+              s.autoCheckUpdates = v;
+              s.changed();
+            }),
+          ),
+          if (widget.updater != null)
+            ListenableBuilder(
+              listenable: widget.updater!,
+              builder: (context, _) {
+                final u = widget.updater!;
+                final rel = u.availableUpdate;
+                final statusText = u.errorMessage ??
+                    u.lastMessage ??
+                    'Version installée : v${u.currentVersion}';
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        statusText,
+                        style: TextStyle(
+                          color: u.errorMessage != null
+                              ? Retro.red
+                              : (rel != null ? prof.accent : Retro.silver),
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: u.checking || u.downloading
+                                ? null
+                                : () async {
+                                    final found = await u.checkForUpdate(silent: false);
+                                    if (found != null && context.mounted) {
+                                      showUpdateDialog(
+                                        context,
+                                        updater: u,
+                                        settings: s,
+                                        release: found,
+                                      );
+                                    }
+                                  },
+                            icon: const Icon(Icons.refresh_rounded, size: 18),
+                            label: Text(u.checking ? 'Vérification…' : 'Vérifier maintenant'),
+                          ),
+                          if (rel != null)
+                            FilledButton.icon(
+                              style: FilledButton.styleFrom(backgroundColor: prof.accent, foregroundColor: Colors.white),
+                              onPressed: u.downloading
+                                  ? null
+                                  : () => showUpdateDialog(
+                                        context,
+                                        updater: u,
+                                        settings: s,
+                                        release: rel,
+                                      ),
+                              icon: const Icon(Icons.system_update_rounded, size: 18),
+                              label: Text('Installer ${rel.tag}'),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           const _Section('Mémoires'),
           ListTile(
             title: const Text('Remettre le trajet à zéro'),

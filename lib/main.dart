@@ -5,6 +5,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'services/dashboard_controller.dart';
 import 'services/settings.dart';
+import 'services/update_service.dart';
 import 'ui/dashboard_screen.dart';
 import 'ui/profile_picker_screen.dart';
 import 'ui/theme.dart';
@@ -34,12 +35,21 @@ Future<void> main() async {
   await settings.load();
   final controller = DashboardController(settings);
   await controller.init();
-  runApp(OldBoardApp(c: controller));
+  final updater = UpdateService();
+  await updater.init();
+  if (settings.autoCheckUpdates && UpdateService.supported) {
+    // Vérification silencieuse en arrière-plan (ne bloque jamais le démarrage ni la conduite)
+    Future.delayed(const Duration(seconds: 2), () {
+      updater.checkForUpdate(silent: true);
+    });
+  }
+  runApp(OldBoardApp(c: controller, updater: updater));
 }
 
 class OldBoardApp extends StatelessWidget {
-  const OldBoardApp({super.key, required this.c});
+  const OldBoardApp({super.key, required this.c, this.updater});
   final DashboardController c;
+  final UpdateService? updater;
 
   @override
   Widget build(BuildContext context) {
@@ -63,7 +73,7 @@ class OldBoardApp extends StatelessWidget {
             );
           },
           home: c.s.profileSelected
-              ? DashboardScreen(c: c)
+              ? DashboardScreen(c: c, updater: updater)
               : ProfilePickerScreen(
                   settings: c.s,
                   isFirstLaunch: true,
