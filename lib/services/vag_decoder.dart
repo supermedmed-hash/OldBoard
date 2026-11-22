@@ -50,15 +50,19 @@ List<VagValue> decodeSimos21F4(int group, List<int> raw) {
 
   switch (group) {
     case 1:
-      // Groupe 001 : b0 = Regime (tr/min = b0 * 32), b1 = Temp. eau G62 (°C), b2 = Tension sonde O2 G39 (V), b3 = Etat binaire
+      // En-tete 0x02 reel 06A906019AM : 80 20 00 | 8C 30 11 ... | 85 05 00 | 88 FF 00
+      // b0 = Regime (b0 * 32 tr/min), b1 = Temp. eau G62 (b1 * 0.75 - 48 °C),
+      // b2 = Tension sonde Lambda G39 (b2 * 5 / 256 V), b3 = Bits etat reglage de base
       return [
         cell(0, b0 * 32.0, 'tr/min'),
         cell(1, (b1 * 0.75) - 48.0, '°C'),
-        cell(2, b2 * 0.005, 'V'),
+        cell(2, b2 * (5.0 / 256.0), 'V'),
         cell(3, b3.toDouble(), '', b3.toRadixString(2).padLeft(8, '0')),
       ];
     case 2:
-      // Groupe 002 : b0 = Regime (tr/min = b0 * 32), b1 = Temps d'injection (b1 * 0.217 ms ROM Simos), b2 = Vitesse (km/h), b3 = Mode (0x04=Ralenti, 0x02=Charge, 0x08=Coupure)
+      // En-tete 0x02 reel : 80 20 00 | 98 D9 00 | 86 01 00 | 88 0F 00
+      // b0 = Regime (b0 * 32 tr/min), b1 = Charge / masse d'air par cycle (b1 * 5.425 mg/H, spec ralenti 76-164 mg/H),
+      // b2 = Vitesse (b2 * 1 km/h), b3 = Mode (0x04=Ralenti, 0x02=Charge, 0x08=Coupure, 0x01=Pleine charge)
       final modeTxt = switch (b3) {
         0x04 => 'Ralenti (0x04)',
         0x02 => 'Charge (0x02)',
@@ -68,42 +72,47 @@ List<VagValue> decodeSimos21F4(int group, List<int> raw) {
       };
       return [
         cell(0, b0 * 32.0, 'tr/min'),
-        cell(1, b1 * 0.217, 'ms'),
+        cell(1, b1 * 5.425, 'mg/H'),
         cell(2, b2 * 1.0, 'km/h'),
         cell(3, b3.toDouble(), '', modeTxt),
       ];
     case 3:
-      // Groupe 003 : b0 = Regime (tr/min = b0 * 32), b1 = Charge (%), b2 = Angle papillon (b2 * 0.4°), b3 = Avance allumage (°)
+      // En-tete 0x02 reel : 80 20 00 | 98 D9 00 | 84 01 00 | 93 64 11 [0..200]
+      // b0 = Regime (tr/min), b1 = Charge moteur (b1 * 217/256 %), b2 = Angle papillon (b2 * 0.4 °),
+      // b3 = Actuateur ralenti (-100..+100 % : b3 * 200/256 - 100)
       return [
         cell(0, b0 * 32.0, 'tr/min'),
-        cell(1, b1 * 1.0, '%'),
+        cell(1, b1 * (217.0 / 256.0), '%'),
         cell(2, b2 * 0.4, '°'),
-        cell(3, (b3 - 128) * 0.75, '°'),
+        cell(3, (b3 * 200.0 / 256.0) - 100.0, '%'),
       ];
     case 4:
-      // Groupe 004 : b0 = Regime (tr/min = b0 * 32), b1 = Charge inj. (ms),
-      // b2 = Masse d'air par cycle (~3.15 mg/coup par LSB) => debit MAF (g/s) = b2 * 3.15 * (rpm / 30000)
-      // (verifie sur 06A906019AM : b2=169 a 3040 tr/min et b2=165 a 4928 tr/min pleine charge -> independant du regime)
-      final rpm = b0 * 32.0;
-      final mafGs = (b2 * 3.15) * (rpm / 30000.0);
-      return [
-        cell(0, rpm, 'tr/min'),
-        cell(1, b1 * 0.217, 'ms'),
-        cell(2, mafGs, 'g/s'),
-        cell(3, b3.toDouble(), '', '0x${b3.toRadixString(16).padLeft(2, '0').toUpperCase()}'),
-      ];
-    case 5:
-      // Groupe 005 : b0 = Regime (tr/min = b0 * 32), b1 = Tension batterie (V), b2 = Temp. eau G62 (°C), b3 = Temp. air G42 (°C)
+      // En-tete 0x02 reel : 80 20 00 | 98 D9 00 | 89 0A 00 | 96 00 00
+      // Manuel atelier VAG Simos 2.1 (06A-906-019) Groupe 004 :
+      // b0 = Regime (tr/min), b1 = Charge / air par cycle (mg/H),
+      // b2 = Temps d'injection reel (b2 * 0.1 ms — spec ralenti 2.0-4.1 ms, 1.20 ms temps mort moteur coupe),
+      // b3 = Debitmetre d'air MAF G70 (b3 * 1.422 g/s — spec ralenti 1.8-3.2 g/s, 15.6 g/s a 83 km/h)
       return [
         cell(0, b0 * 32.0, 'tr/min'),
-        cell(1, b1 * 0.1, 'V'),
+        cell(1, b1 * 5.425, 'mg/H'),
+        cell(2, b2 * 0.1, 'ms'),
+        cell(3, b0 == 0 ? 0.0 : b3 * 1.422, 'g/s'),
+      ];
+    case 5:
+      // En-tete 0x02 reel : 80 20 00 | 85 1A 00 | 8C 30 11 ... | 8C 30 11 ...
+      // b0 = Regime (tr/min), b1 = Tension batterie exacte (b1 * 26/256 V : 140 -> 14.22 V),
+      // b2 = Temp. eau G62 (°C), b3 = Temp. air admission G42 (°C)
+      return [
+        cell(0, b0 * 32.0, 'tr/min'),
+        cell(1, b1 * (26.0 / 256.0), 'V'),
         cell(2, (b2 * 0.75) - 48.0, '°C'),
         cell(3, (b3 * 0.75) - 48.0, '°C'),
       ];
     case 7:
-      // Groupe 007 : b1 = Regulation lambda (%), b2 = Adaptation lambda (%), b3 = Etat
+      // En-tete 0x02 reel : 84 01 00 | 92 27 00 | 92 27 00 | 88 0F 00
+      // b0 = Angle papillon (b0 * 0.4 °), b1 = Regulation lambda ((b1-128)*0.78 %), b2 = Adaptation lambda (%), b3 = Mode
       return [
-        cell(0, b0.toDouble(), '', 'b0=$b0'),
+        cell(0, b0 * 0.4, '°'),
         cell(1, (b1 - 128) * 0.78, '%'),
         cell(2, (b2 - 128) * 0.78, '%'),
         cell(3, b3.toDouble(), '', '0x${b3.toRadixString(16).padLeft(2, '0').toUpperCase()}'),

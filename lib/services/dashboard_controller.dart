@@ -531,11 +531,11 @@ class DashboardController extends ChangeNotifier {
     EngineRole.rpm: '1:0',
     EngineRole.coolant: '1:1',
     EngineRole.lambda: '7:1',
-    EngineRole.injection: '2:1',
+    EngineRole.injection: '4:2', // Vrai temps d'injection (Grp 004 champ 2 : b2 * 0.1 ms, spec ralenti 2.0-4.1 ms)
     EngineRole.speed: '2:2',
     EngineRole.load: '3:1',
     EngineRole.throttle: '3:2',
-    EngineRole.maf: '4:2',
+    EngineRole.maf: '4:3', // Vrai debitmetre MAF G70 (Grp 004 champ 3 : b3 * 1.422 g/s, spec ralenti 1.8-3.2 g/s)
     EngineRole.battery: '5:1',
     EngineRole.intakeAir: '5:3',
   };
@@ -710,14 +710,23 @@ class DashboardController extends ChangeNotifier {
       }
     }
 
-    // Priorite 1 (Essence) : debitmetre d'air MAF (G70, Groupe 4 champ 2) si disponible, corrige par lambda
+    // Mode Simos 2.1 (0xF4) : calcul OEM identique au vrai compteur Audi VDO FIS
+    // via temps d'injection reel (Grp 004 champ 2 : b2 * 0.1 ms) + debit injecteurs 037906031AA (205 cc/min @ 3 bar, deadTime 0.85 ms)
+    // Inclut automatiquement l'enrichissement a froid, la pleine charge, le lambda et une resolution fine de 0.1 ms.
+    final inj = data.get(EngineRole.injection);
+    if (isSimosF4 && inj != null) {
+      final eff = math.max(0.0, inj - s.injectorDeadTime);
+      final ccPerHour = s.cylinders * (r / 2) * 60 * (s.injectorFlow / 60000 * eff);
+      return ccPerHour / 1000 * s.calibration;
+    }
+
+    // Priorite 1 (autres Essence 0xE7) : debitmetre d'air MAF (G70) si disponible, corrige par lambda
     final maf = data.get(EngineRole.maf);
     if (maf != null && maf > 0.2) {
       final lam = data.get(EngineRole.lambda) ?? 0.0;
       final corr = (1.0 + lam / 100.0).clamp(0.75, 1.35);
       return (maf / 14.7) * corr * 3600 / 745 * s.calibration;
     }
-    final inj = data.get(EngineRole.injection);
     if (inj != null) {
       final eff = math.max(0.0, inj - s.injectorDeadTime);
       // injection sequentielle : 1 injection par cylindre tous les 2 tours

@@ -187,7 +187,7 @@ class VehicleProfile {
       fuelType: FuelType.petrol,
       hasTurbo: true,
       tankCapacity: 55,
-      injectorFlow: 280,
+      injectorFlow: 260, // Bosch 0280150464 (06A906031) : ~258-260 cc/min @ 3 bar
       injectorDeadTime: 0.85,
       shiftRpm: 6200,
       accent: Color(0xFFE1061B),
