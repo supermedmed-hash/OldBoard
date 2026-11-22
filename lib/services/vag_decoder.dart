@@ -81,11 +81,12 @@ List<VagValue> decodeSimos21F4(int group, List<int> raw) {
         cell(3, (b3 - 128) * 0.75, '°'),
       ];
     case 4:
-      // Groupe 004 : b0 = Regime (tr/min = b0 * 32), b1 = Charge inj., b2 = Debitmetre air MAF G70 (b2 * 0.1 g/s), b3 = Etat
+      // Groupe 004 : b0 = Regime (tr/min = b0 * 32), b1 = Charge inj. (ms),
+      // b2 = Debitmetre air MAF G70 en kg/h (1 kg/h par LSB => b2 / 3.6 g/s), b3 = Etat
       return [
         cell(0, b0 * 32.0, 'tr/min'),
         cell(1, b1 * 0.217, 'ms'),
-        cell(2, b2 * 0.1, 'g/s'),
+        cell(2, b2 / 3.6, 'g/s'),
         cell(3, b3.toDouble(), '', '0x${b3.toRadixString(16).padLeft(2, '0').toUpperCase()}'),
       ];
     case 5:
