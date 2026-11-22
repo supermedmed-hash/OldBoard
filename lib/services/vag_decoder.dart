@@ -82,11 +82,14 @@ List<VagValue> decodeSimos21F4(int group, List<int> raw) {
       ];
     case 4:
       // Groupe 004 : b0 = Regime (tr/min = b0 * 32), b1 = Charge inj. (ms),
-      // b2 = Debitmetre air MAF G70 en kg/h (1 kg/h par LSB => b2 / 3.6 g/s), b3 = Etat
+      // b2 = Masse d'air par cycle (~3.15 mg/coup par LSB) => debit MAF (g/s) = b2 * 3.15 * (rpm / 30000)
+      // (verifie sur 06A906019AM : b2=169 a 3040 tr/min et b2=165 a 4928 tr/min pleine charge -> independant du regime)
+      final rpm = b0 * 32.0;
+      final mafGs = (b2 * 3.15) * (rpm / 30000.0);
       return [
-        cell(0, b0 * 32.0, 'tr/min'),
+        cell(0, rpm, 'tr/min'),
         cell(1, b1 * 0.217, 'ms'),
-        cell(2, b2 / 3.6, 'g/s'),
+        cell(2, mafGs, 'g/s'),
         cell(3, b3.toDouble(), '', '0x${b3.toRadixString(16).padLeft(2, '0').toUpperCase()}'),
       ];
     case 5:
