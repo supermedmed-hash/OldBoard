@@ -482,6 +482,15 @@ class Kwp1281(private val port: UsbSerialPort, private val log: (String) -> Unit
                 log("Groupe %03d [0xE7] : %d cellules".format(group, out.size))
                 out
             }
+            0x09 -> {
+                // ACK KWP1281 standard renvoye par le Simos 2.1 pendant que le reglage de base s'execute
+                log("Groupe %03d : ACK 0x09 (réglage de base actif)".format(group))
+                emptyList()
+            }
+            0x0A -> {
+                log("Groupe %03d : NACK 0x0A (groupe non supporté)".format(group))
+                null
+            }
             else -> {
                 log("Groupe %03d : réponse inattendue titre=0x%02X | RX=[%s]".format(group, blk.title, lastRxHex()))
                 null

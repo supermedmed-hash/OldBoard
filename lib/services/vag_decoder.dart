@@ -50,11 +50,11 @@ List<VagValue> decodeSimos21F4(int group, List<int> raw) {
 
   switch (group) {
     case 1:
-      // Groupe 001 : b0 = Regime (tr/min = b0 * 32), b1 = Temp. eau G62 (°C), b2 = Tension/ Facteur sonde, b3 = Etat binaire
+      // Groupe 001 : b0 = Regime (tr/min = b0 * 32), b1 = Temp. eau G62 (°C), b2 = Tension sonde O2 G39 (V), b3 = Etat binaire
       return [
         cell(0, b0 * 32.0, 'tr/min'),
         cell(1, (b1 * 0.75) - 48.0, '°C'),
-        cell(2, (b2 - 128) * 0.78, '%'),
+        cell(2, b2 * 0.005, 'V'),
         cell(3, b3.toDouble(), '', b3.toRadixString(2).padLeft(8, '0')),
       ];
     case 2:
@@ -73,12 +73,12 @@ List<VagValue> decodeSimos21F4(int group, List<int> raw) {
         cell(3, b3.toDouble(), '', modeTxt),
       ];
     case 3:
-      // Groupe 003 : b0 = Regime (tr/min = b0 * 32), b1 = Charge (%), b2 = Angle papillon (°), b3 = Actuateur (%)
+      // Groupe 003 : b0 = Regime (tr/min = b0 * 32), b1 = Charge (%), b2 = Angle papillon (b2 * 0.4°), b3 = Avance allumage (°)
       return [
         cell(0, b0 * 32.0, 'tr/min'),
         cell(1, b1 * 1.0, '%'),
-        cell(2, b2 * 0.2, '°'),
-        cell(3, b3 / 2.55, '%'),
+        cell(2, b2 * 0.4, '°'),
+        cell(3, (b3 - 128) * 0.75, '°'),
       ];
     case 4:
       // Groupe 004 : b0 = Regime (tr/min = b0 * 32), b1 = Charge inj., b2 = Debitmetre air MAF G70 (b2 * 0.1 g/s), b3 = Etat
